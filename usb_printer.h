@@ -44,7 +44,7 @@ class UsbPrinter {
 
   // Determines whether |usb_request| is either a control or data request and
   // defers to the corresponding function.
-  void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request);
+  void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request) const;
 
   // Determines whether |usb_request| is either a standard or class-specific
   // control request and defers to the corresponding function.

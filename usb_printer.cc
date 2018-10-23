@@ -79,7 +79,7 @@ UsbPrinter::UsbPrinter(
       endpoints_(endpoints) {}
 
 void UsbPrinter::HandleUsbRequest(int sockfd,
-                                  const UsbipCmdSubmit& usb_request) {
+                                  const UsbipCmdSubmit& usb_request) const {
   // Endpoint 0 is used for USB control requests.
   if (usb_request.header.ep == 0) {
     LOG(INFO) << "# Control Request";
