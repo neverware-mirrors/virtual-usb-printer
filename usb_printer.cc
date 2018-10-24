@@ -86,7 +86,11 @@ void UsbPrinter::HandleUsbRequest(int sockfd,
     HandleUsbControl(sockfd, usb_request);
   } else {
     LOG(INFO) << "# Data Request";
-    HandleUsbData(sockfd, usb_request);
+    if (usb_request.header.direction == 1) {
+      HandleBulkInRequest(sockfd, usb_request);
+    } else {
+      HandleUsbData(sockfd, usb_request);
+    }
   }
 }
 
@@ -117,6 +121,7 @@ void UsbPrinter::HandleUsbData(int sockfd,
       ReceiveBuffer(sockfd, usb_request.transfer_buffer_length);
   size_t received = smart_buffer.size();
   LOG(INFO) << "Received " << received << " bytes";
+  // Acknowledge receipt of BULK transfer.
   SendUsbDataResponse(sockfd, usb_request, received);
 }
 
@@ -324,4 +329,9 @@ void UsbPrinter::HandleGetDeviceId(
   SmartBuffer response(ieee_device_id_.size());
   response.Add(ieee_device_id_.data(), ieee_device_id_.size());
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
+}
+
+void UsbPrinter::HandleBulkInRequest(int sockfd,
+                                     const UsbipCmdSubmit& usb_request) const {
+  SendUsbControlResponse(sockfd, usb_request, 0, 0);
 }

@@ -95,6 +95,8 @@ class UsbPrinter {
   void HandleGetDeviceId(int sockfd, const UsbipCmdSubmit& usb_request,
                          const UsbControlRequest& control_request) const;
 
+  void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request) const;
+
   UsbDeviceDescriptor device_descriptor_;
   UsbConfigurationDescriptor configuration_descriptor_;
   UsbDeviceQualifierDescriptor qualifier_descriptor_;

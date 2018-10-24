@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef __USBIP_SERVER_H__
+#define __USBIP_SERVER_H__
+
 #include "usb_printer.h"
 #include "smart_buffer.h"
 
@@ -58,3 +61,5 @@ void HandleConnection(const UsbPrinter& printer, base::ScopedFD connection);
 
 // Runs a simple server which processes USBIP requests.
 void RunServer(const UsbPrinter& printer);
+
+#endif  // __USBIP_SERVER_H__
