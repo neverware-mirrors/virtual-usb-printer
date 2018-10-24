@@ -31,6 +31,27 @@
     ['USE_test == 1', {
       'targets': [
         {
+          'target_name': 'ipp-util-testrunner',
+          'type': 'executable',
+          'dependencies': [
+            '../../platform2/common-mk/testrunner.gyp:testrunner',
+          ],
+          'variables': {
+            'deps': [
+              'libchrome-test-<(libbase_ver)',
+            ],
+          },
+          'sources': [
+            'ipp_util.cc',
+            'ipp_test.cc',
+            'smart_buffer.cc',
+            'value_util.cc',
+          ],
+          'libraries': [
+            '-lcups',
+          ],
+        },
+        {
           'target_name': 'smart-buffer-testrunner',
           'type': 'executable',
           'dependencies': [
