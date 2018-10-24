@@ -1,0 +1,80 @@
+{
+    "device_descriptor": {
+        "bLength": 18,
+        "bDescriptorType": 1,
+        "bcdUSB": 272,
+        "bDeviceClass": 0,
+        "bDeviceSubClass": 0,
+        "bDeviceProtocol": 0,
+        "bMaxPacketSize0": 8,
+        "idVendor": 1193,
+        "idProduct": 10216,
+        "bcdDevice": 0,
+        "iManufacturer": 1,
+        "iProduct": 2,
+        "iSerialNumber": 1,
+        "bNumConfigurations": 1
+    },
+    "configuration_descriptor": {
+        "bLength": 9,
+        "bDescriptorType": 2,
+        "wTotalLength": 32,
+        "bNumInterfaces": 1,
+        "bConfigurationValue": 1,
+        "iConfiguration": 0,
+        "bmAttributes": 128,
+        "bMaxPower": 0
+    },
+    "device_qualifier_descriptor": {
+        "bLength": 10,
+        "bDescriptorType": 6,
+        "bcdUSB": 272,
+        "bDeviceClass": 0,
+        "bDeviceSubClass": 0,
+        "bDeviceProtocol": 0,
+        "bMaxPacketSize0": 255,
+        "bNumConfigurations": 1,
+        "bReserved": 0
+    },
+    "interface_descriptors": [{
+	"bLength": 9,
+	"bDescriptorType": 4,
+	"bInterfaceNumber": 0,
+	"bAlternateSetting": 0,
+	"bNumEndpoints": 2,
+        "bInterfaceClass": 7,
+        "bInterfaceSubClass": 1,
+        "bInterfaceProtocol": 2,
+        "iInterface": 0,
+        "endpoints": [{
+	  "bLength": 7,
+          "bDescriptorType": 5,
+          "bEndpointAddress": 1,
+          "bmAttributes": 2,
+          "wMaxPacketSize": 512,
+          "bInterval": 0
+        }, {
+          "bLength": 7,
+          "bDescriptorType": 5,
+          "bEndpointAddress": 129,
+          "bmAttributes": 2,
+          "wMaxPacketSize": 512,
+          "bInterval": 0
+        }]
+    }],
+    "language_descriptor": {
+        "bLength": 4,
+        "bDescriptorType": 3,
+        "langID1": 9,
+        "langID2": 4
+    },
+    "string_descriptors": [
+        "DavieV",
+        "Virtual USB Printer"
+    ],
+    "ieee_device_id": {
+        "bLength1": 0,
+        "bLength2": 26,
+        "message": "MFG:DV3;CMD:PDF;MDL:VTL;"
+    }
+}

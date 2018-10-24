@@ -6,7 +6,8 @@
 
 #include <cstdio>
 
-bool operator==(const UsbDeviceDescriptor& lhs, const UsbDeviceDescriptor& rhs) {
+bool operator==(const UsbDeviceDescriptor& lhs,
+                const UsbDeviceDescriptor& rhs) {
   return lhs.bLength == rhs.bLength &&
          lhs.bDescriptorType == rhs.bDescriptorType &&
          lhs.bcdUSB == rhs.bcdUSB && lhs.bDeviceClass == rhs.bDeviceClass &&
