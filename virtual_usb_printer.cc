@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <cstdio>
+#include <map>
 #include <string>
 #include <vector>
-#include <cstdio>
 
 #include <base/files/file_path.h>
 #include <base/files/file_util.h>
@@ -27,7 +28,8 @@
 namespace {
 
 constexpr char kUsage[] =
-    "virtual_usb_printer --descriptors_path=<path> [--record_doc_path=<path>]";
+    "virtual_usb_printer --descriptors_path=<path> [--record_doc_path=<path>] "
+    "[--attributes_path=<path>]";
 
 // Create a new UsbDescriptors object using the USB descriptors defined in
 // |printer_config|.
@@ -54,6 +56,7 @@ UsbDescriptors CreateUsbDescriptors(
 int main(int argc, char* argv[]) {
   DEFINE_string(descriptors_path, "", "Path to descriptors JSON file");
   DEFINE_string(record_doc_path, "", "Path to file to record document to");
+  DEFINE_string(attributes_path, "", "Path to IPP attributes JSON file");
 
   brillo::FlagHelper::Init(argc, argv, "Virtual USB Printer");
   brillo::InitLog(brillo::kLogToSyslog | brillo::kLogToStderrIfTty);
@@ -92,5 +95,31 @@ int main(int argc, char* argv[]) {
     LOG(ERROR) << "Error code: " << printer.FileError();
     return 1;
   }
+
+  // Load ipp attributes if |FLAGS_attributes_path| is set.
+  std::unique_ptr<base::Value> attributes;
+  if (!FLAGS_attributes_path.empty()) {
+    base::Optional<std::string> attributes_contents =
+        GetJSONContents(FLAGS_attributes_path);
+    if (!attributes_contents.has_value()) {
+      LOG(ERROR) << "Failed to load file contents for "
+                 << FLAGS_attributes_path;
+      return 1;
+    }
+    attributes = json_reader.Read(*attributes_contents);
+    if (attributes == nullptr) {
+      LOG(ERROR) << "Failed to parse " << FLAGS_attributes_path;
+      return 1;
+    }
+
+    std::vector<IppAttribute> operation_attributes =
+        GetAttributes(attributes.get(), kOperationAttributes);
+    std::vector<IppAttribute> printer_attributes =
+        GetAttributes(attributes.get(), kPrinterAttributes);
+
+    printer.SetOperationAttributes(operation_attributes);
+    printer.SetPrinterAttributes(printer_attributes);
+  }
+
   RunServer(printer);
 }

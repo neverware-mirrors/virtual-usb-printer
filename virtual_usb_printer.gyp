@@ -13,6 +13,7 @@
       'type': 'executable',
       'sources': [
         'device_descriptors.cc',
+        'ipp_util.cc',
         'load_config.cc',
         'op_commands.cc',
         'server.cc',

@@ -50,6 +50,8 @@
 #define COMMAND_USBIP_RET_SUBMIT 0x0003
 #define COMMAND_USBIP_RET_UNLINK 0x0004
 
+#define IPP_GET_PRINTER_ATTRIBUTES 0x000B
+
 // Port that the server is bound to.
 #define TCP_SERV_PORT 3240
 

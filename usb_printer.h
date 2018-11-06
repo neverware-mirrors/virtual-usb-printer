@@ -6,11 +6,13 @@
 #define __USBIP_USB_PRINTER_H__
 
 #include "device_descriptors.h"
+#include "ipp_util.h"
 #include "smart_buffer.h"
 #include "usbip.h"
 #include "usbip_constants.h"
 
 #include <map>
+#include <queue>
 #include <vector>
 
 #include <base/files/file.h>
@@ -116,6 +118,31 @@ class UsbPrinter {
 
   std::string record_document_path() const { return record_document_path_; }
 
+  // Returns true if this printer supports ipp-over-usb. An ippusb printer must
+  // have at least 2 interfaces with the following values:
+  //    bInterfaceClass: 7
+  //    bInterfaceSubClass: 1
+  //    bInterfaceProtocol: 4
+  bool IsIppUsb() const;
+
+  std::vector<IppAttribute> operation_attributes() const {
+    return operation_attributes_;
+  }
+
+  std::vector<IppAttribute> printer_attributes() const {
+    return printer_attributes_;
+  }
+
+  void SetOperationAttributes(
+      const std::vector<IppAttribute>& operation_attributes) {
+    operation_attributes_ = operation_attributes;
+  }
+
+  void SetPrinterAttributes(
+      const std::vector<IppAttribute>& printer_attributes) {
+    printer_attributes_ = printer_attributes;
+  }
+
   // Determines whether |usb_request| is either a control or data request and
   // defers to the corresponding function.
   void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request) const;
@@ -125,6 +152,8 @@ class UsbPrinter {
   void HandleUsbControl(int sockfd, const UsbipCmdSubmit& usb_request) const;
 
   void HandleUsbData(int sockfd, const UsbipCmdSubmit& usb_request) const;
+
+  void HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request) const;
 
   // Handles the standard USB requests.
   void HandleStandardControl(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -143,6 +172,15 @@ class UsbPrinter {
   // Returns the error from |record_document_file_|. Used to identify why file
   // creation failed.
   base::File::Error FileError() const;
+
+  // Place |message| on the end of |message_queue_|.
+  void QueueMessage(const SmartBuffer& message) const;
+
+  // Pop the message from the front of |message_queue_|.
+  SmartBuffer PopMessage() const;
+
+  // Returns whether or not |message_queue_| is empty.
+  bool QueueEmpty() const;
 
  private:
   void HandleGetStatus(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -179,14 +217,29 @@ class UsbPrinter {
   void HandleGetDeviceId(int sockfd, const UsbipCmdSubmit& usb_request,
                          const UsbControlRequest& control_request) const;
 
-  void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request) const;
-
   void WriteDocument(const SmartBuffer& data) const;
+
+  void HandleGetPrinterAttributes(int sockfd, const UsbipCmdSubmit& usb_request,
+                                  const IppHeader& ipp_header) const;
+
+  // Place a response to an IPP reqest onto |message_queue_|.
+  void QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
+                           const SmartBuffer& attributes_buffer) const;
+
+  // Responds to a BULK_IN request by replying with the message at the front of
+  // |message_queue_|.
+  void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request) const;
 
   UsbDescriptors usb_descriptors_;
   bool record_document_;
   std::string record_document_path_;
   mutable base::File record_document_file_;
+
+  std::vector<IppAttribute> operation_attributes_;
+  std::vector<IppAttribute> printer_attributes_;
+
+  // Queue used to store IPP responses until they are requested from BULK_IN.
+  mutable std::queue<SmartBuffer> message_queue_;
 };
 
 #endif  // __USBIP_USB_PRINTER_H__
