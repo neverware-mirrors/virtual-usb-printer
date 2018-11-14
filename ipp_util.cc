@@ -242,11 +242,14 @@ bool ContainsHttpHeader(const SmartBuffer& message) {
   return MessageContains(message, "POST /ipp/print HTTP");
 }
 
-bool ContainsIppHeader(const SmartBuffer& message) {
-  CHECK(ContainsHttpHeader(message));
-  // If |message| contains an HTTP header, then any contents that immediately
-  // follow must be the IPP header. This checks to see that |message| has
-  // contents following the end of the HTTP header.
+bool ContainsHttpBody(const SmartBuffer& message) {
+  // We are making the assumption that if |message| does not contain an HTTP
+  // header then |message| is the body of an HTTP message.
+  if (!ContainsHttpHeader(message)) {
+    return true;
+  }
+  // If |message| contains an HTTP header, check to see if there's anything
+  // immediately following it.
   ssize_t pos = FindFirstOccurrence(message, "\r\n\r\n");
   CHECK_GE(pos, 0) << "HTTP header does not contain end-of-header marker";
   size_t start = pos + 4;
@@ -305,6 +308,7 @@ SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message) {
   if (start == -1) {
     return ret;
   }
+
   ret.Add(*message, start + 2, chunk_size);
   // In case |message| contains multiple chunks, we remove the chunk which was
   // just parsed.
@@ -325,6 +329,11 @@ SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message) {
   return ret;
 }
 
+bool ContainsFinalChunk(const SmartBuffer& message) {
+  ssize_t i = FindFirstOccurrence(message, "0\r\n\r\n");
+  return i > 0 && message.size() == i + 5;
+}
+
 bool ProcessMessageChunks(SmartBuffer* message) {
   CHECK(message != nullptr) << "Process - Given null message";
   if (IsHttpChunkedMessage(*message)) {
@@ -339,6 +348,28 @@ bool ProcessMessageChunks(SmartBuffer* message) {
     chunk = ParseHttpChunkedMessage(message);
   }
   return chunk.size() != 0;
+}
+
+void RemoveHttpHeader(SmartBuffer* message) {
+  CHECK(ContainsHttpHeader(*message)) << "Message does not contain HTTP header";
+  int i = FindFirstOccurrence(*message, "\r\n\r\n");
+  CHECK_GT(i, 0) << "Failed to find end of HTTP header";
+  message->Erase(0, i + 4);
+}
+
+SmartBuffer ExtractIppMessage(SmartBuffer* message) {
+  CHECK_NE(message, nullptr) << "Received null message";
+  return ParseHttpChunkedMessage(message);
+}
+
+SmartBuffer MergeDocument(SmartBuffer* message) {
+  CHECK_NE(message, nullptr) << "Received null message";
+  SmartBuffer document;
+  while (message->size() > 0) {
+    SmartBuffer chunk = ParseHttpChunkedMessage(message);
+    document.Add(chunk);
+  }
+  return document;
 }
 
 std::string GetHttpResponseHeader(size_t size) {

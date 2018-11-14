@@ -808,7 +808,7 @@
   {
    "type": "enum",
    "name": "job-state",
-   "value": 3
+   "value": 9
   },
   {
    "type": "keyword",
@@ -828,7 +828,7 @@
   {
    "type": "integer",
    "name": "time-at-completed",
-   "value": 0
+   "value": 16741128
   },
   {
    "type": "integer",

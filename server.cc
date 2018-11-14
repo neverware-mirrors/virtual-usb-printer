@@ -188,8 +188,6 @@ bool HandleUsbRequest(const UsbPrinter& printer, int connection) {
   }
 
   UnpackUsbip(reinterpret_cast<int*>(&command), sizeof(command));
-  PrintUsbipCmdSubmit(command);
-
   if (command.header.command == COMMAND_USBIP_CMD_SUBMIT) {
     printer.HandleUsbRequest(connection, command);
     return true;

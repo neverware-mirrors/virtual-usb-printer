@@ -43,10 +43,18 @@ class InterfaceManager {
     chunked_ipp_header_ = ipp_header;
   }
 
-  const SmartBuffer& chunked_message() const {
-    return chunked_message_;
+  SmartBuffer* chunked_message() {
+    return &chunked_message_;
   }
   void ChunkedMessageAdd(const SmartBuffer& message);
+
+  const SmartBuffer& document() const { return document_; }
+  void SetDocument(const SmartBuffer& document) { document_ = document; }
+
+  const SmartBuffer& ipp_message() const { return ipp_message_; }
+  void SetIppMessage(const SmartBuffer& ipp_message) {
+    ipp_message_ = ipp_message;
+  }
 
  private:
   std::queue<SmartBuffer> queue_;
@@ -55,6 +63,9 @@ class InterfaceManager {
   bool receiving_chunked_;
   IppHeader chunked_ipp_header_;
   SmartBuffer chunked_message_;
+
+  SmartBuffer ipp_message_;
+  SmartBuffer document_;
 };
 
 // A grouping of the descriptors for a USB device.
@@ -252,7 +263,13 @@ class UsbPrinter {
   const IppHeader& GetChunkedIppHeader(int ep) const;
 
   void ChunkedMessageAdd(int ep, const SmartBuffer& message) const;
-  const SmartBuffer& GetChunkedMessage(int ep) const;
+  SmartBuffer* GetChunkedMessage(int ep) const;
+
+  void SetIppMessage(int ep, const SmartBuffer& ipp_message) const;
+  const SmartBuffer& GetIppMessage(int ep) const;
+
+  void SetDocument(int ep, const SmartBuffer& document) const;
+  const SmartBuffer& GetDocument(int ep) const;
 
  private:
   void HandleGetStatus(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -303,6 +320,9 @@ class UsbPrinter {
 
   void HandleSendDocument(const UsbipCmdSubmit& usb_request,
                           const IppHeader& request_header) const;
+
+  void HandleGetJobAttributes(const UsbipCmdSubmit& usb_request,
+                              const IppHeader& request_header) const;
 
   void QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
                            const SmartBuffer& attributes_buffer) const;

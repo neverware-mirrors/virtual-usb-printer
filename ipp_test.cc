@@ -105,23 +105,37 @@ TEST(IsHttpChunkedHeader, ContainsChunkedEncoding) {
   EXPECT_TRUE(IsHttpChunkedMessage(buf));
 }
 
-TEST(ContainsIppHeader, ContainsHeader) {
-  const std::string http_header =
+TEST(ContainsHttpBody, ContainsHeader) {
+  const std::string message =
       "POST /ipp/print HTTP/1.1\x0d\x0a\x0d\x0a"
-      // IPP header.
+      // message body.
       "\x02\x00\x00\x0b\x00\x00\x00\x01"s;
 
-  std::vector<uint8_t> bytes = CreateByteVector(http_header);
+  // We expect ContainsHttpBody to return true since |message| contains an HTTP
+  // header with contents immediately following the header.
+  std::vector<uint8_t> bytes = CreateByteVector(message);
   SmartBuffer buf(bytes);
-  EXPECT_TRUE(ContainsIppHeader(buf));
+  EXPECT_TRUE(ContainsHttpBody(buf));
 }
 
-TEST(ContainsIppHeader, NoHeader) {
-  const std::string http_header = "POST /ipp/print HTTP/1.1\x0d\x0a\x0d\x0a";
+TEST(ContainsHttpBody, NoBody) {
+  const std::string message = "POST /ipp/print HTTP/1.1\x0d\x0a\x0d\x0a";
 
-  std::vector<uint8_t> bytes = CreateByteVector(http_header);
+  // We expect ContainsHttpBody to return false since |message| contains an HTTP
+  // header with nothing immediately following it.
+  std::vector<uint8_t> bytes = CreateByteVector(message);
   SmartBuffer buf(bytes);
-  EXPECT_FALSE(ContainsIppHeader(buf));
+  EXPECT_FALSE(ContainsHttpBody(buf));
+}
+
+TEST(ContainsHttpBody, NoHttpHeader) {
+  const std::string message = "\x02\x00\x00\x0b\x00\x00\x00\x01"s;
+
+  // Since |message| does not contain an HTTP header, we assume that the
+  // contents are the message body.
+  std::vector<uint8_t> bytes = CreateByteVector(message);
+  SmartBuffer buf(bytes);
+  EXPECT_TRUE(ContainsHttpBody(buf));
 }
 
 // Test that we can extract the IPP header from a message with an HTTP chunk
@@ -191,6 +205,42 @@ TEST(ParseHttpChunkedMessage, MultipleChunks) {
   EXPECT_EQ(message_buffer.size(), 0);
 }
 
+TEST(ContainsFinalChunk, DoesContainFinalChunk) {
+  const std::string message =
+      "5\r\n"
+      "hello\r\n"
+      "0\r\n\r\n";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+  EXPECT_TRUE(ContainsFinalChunk(message_buffer));
+}
+
+TEST(ContainsFinalChunk, NoFinalChunk) {
+  const std::string message =
+      "4\r\n"
+      "test\r\n"
+      "5\r\n"
+      "chunk\r\n";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+  EXPECT_FALSE(ContainsFinalChunk(message_buffer));
+}
+
+// Tests that ContainsFinalChunk will only return true when the final chunk
+// (0\r\n\r\n) is found at the end of the message. In this case the final chunk
+// is present as the message contents of one of the chunks, so it should not be
+// treated as the final chunk.
+TEST(ContainsFinalChunk, NotAtEnd) {
+  const std::string message =
+      "3\r\n"
+      "0\r\n\r\n"
+      "4\r\n"
+      "test\r\n";
+  SmartBuffer buf;
+  buf.Add(message);
+  EXPECT_FALSE(ContainsFinalChunk(buf));
+}
+
 TEST(ProcessMessageChunks, ContainsHttpHeader) {
   const std::string message =
       "Transfer-Encoding: chunked\r\n\r\n"
@@ -229,6 +279,58 @@ TEST(ProcessMessageChunks, MultipleChunks) {
 
 // Verify that GetHttpResponseHeader produces an HTTP header with the correct
 // value set for the "Content-Length" field.
+TEST(RemoveHttpHeader, ContainsHeader) {
+  const std::string message = "POST /ipp/print HTTP/1.1\r\n\r\ntest";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+  RemoveHttpHeader(&message_buffer);
+
+  const std::vector<uint8_t> expected = {'t', 'e', 's', 't'};
+  EXPECT_EQ(message_buffer.contents(), expected);
+}
+
+TEST(RemoveHttpHeader, NoHeader) {
+  const std::string message = "no http header";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+  EXPECT_DEATH(RemoveHttpHeader(&message_buffer),
+               "Message does not contain HTTP header");
+}
+
+TEST(RemoveHttpHeader, InvalidHeader) {
+  const std::string message =
+      "POST /ipp/print HTTP/1.1 missing end of header indicator";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+  EXPECT_DEATH(RemoveHttpHeader(&message_buffer),
+               "Failed to find end of HTTP header");
+}
+
+TEST(MergeDocument, ValidMessage) {
+  const std::string message =
+      "6\r\n"
+      "these \r\n"
+      "7\r\n"
+      "chunks \r\n"
+      "7\r\n"
+      "should \r\n"
+      "5\r\n"
+      "form \r\n"
+      "14\r\n"
+      "a complete sentence.\r\n"
+      "0\r\n\r\n";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+
+  const std::string expected_string =
+      "these chunks should form a complete sentence.";
+  const std::vector<uint8_t> expected = CreateByteVector(expected_string);
+
+  SmartBuffer document = MergeDocument(&message_buffer);
+  EXPECT_EQ(message_buffer.size(), 0);
+  EXPECT_EQ(document.contents(), expected);
+}
+
 TEST(GetHttpResponseHeader, VerifyContentLength) {
   // The value we expect to be set for the "Content-Length" field in the
   // produced HTTP message.
