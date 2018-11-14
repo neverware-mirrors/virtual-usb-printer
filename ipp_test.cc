@@ -4,9 +4,9 @@
 
 #include "ipp_util.h"
 
-#include "smart_buffer.h"
-#include "value_util.h"
-
+#include <cups/cups.h>
+#include <algorithm>
+#include <cstring>
 #include <vector>
 
 #include <gmock/gmock.h>
@@ -14,9 +14,8 @@
 #include <base/json/json_reader.h>
 #include <base/values.h>
 
-#include <cstring>
-
-#include <cups/cups.h>
+#include "smart_buffer.h"
+#include "value_util.h"
 
 namespace {
 
@@ -57,16 +56,16 @@ TEST(IppAttributeEquality, DifferentNames) {
 
 TEST(GetIppHeader, VerifyHeaderExtraction) {
   const std::string http_header =
-      // HTTP header
+      // HTTP header.
       "POST /ipp/print HTTP/1.1\x0d\x0a"
       "Content-Length: 116\x0d\x0a"
       "Content-Type: application/ipp\x0d\x0a"
       "Host: localhost:0\x0d\x0a"
       "User-Agent: CUPS/2.1.4 (Linux 4.14.62; x86_64) IPP/2.0\x0d\x0a"
       "Expect: 100-continue\x0d\x0a\x0d\x0a"
-      // IPP header
+      // IPP header.
       "\x02\x00\x00\x0b\x00\x00\x00\x03"
-      // IPP attributes
+      // IPP attributes.
       "\x01\x47\x00\x12"
       "attributes-charset"
       "\x00\x05"
@@ -89,6 +88,143 @@ TEST(GetIppHeader, VerifyHeaderExtraction) {
   EXPECT_EQ(ipp_header.minor, 0);
   EXPECT_EQ(ipp_header.operation_id, 0x000b);
   EXPECT_EQ(ipp_header.request_id, 3);
+}
+
+TEST(IsHttpChunkedHeader, ContainsChunkedEncoding) {
+  const std::string http_header =
+      "POST /ipp/print HTTP/1.1\x0d\x0a"
+      "Content-Type: application/ipp\x0d\x0a"
+      "Date: Mon, 12 Nov 2018 19:17:31 GMT\x0d\x0a"
+      "Host: localhost:0\x0d\x0a"
+      "Transfer-Encoding: chunked\x0d\x0a"
+      "User-Agent: CUPS/2.2.8 (Linux 4.14.82; x86_64) IPP/2.0\x0d\x0a"
+      "Expect: 100-continue\x0d\x0a\x0d\x0a"s;
+
+  std::vector<uint8_t> bytes = CreateByteVector(http_header);
+  SmartBuffer buf(bytes);
+  EXPECT_TRUE(IsHttpChunkedMessage(buf));
+}
+
+TEST(ContainsIppHeader, ContainsHeader) {
+  const std::string http_header =
+      "POST /ipp/print HTTP/1.1\x0d\x0a\x0d\x0a"
+      // IPP header.
+      "\x02\x00\x00\x0b\x00\x00\x00\x01"s;
+
+  std::vector<uint8_t> bytes = CreateByteVector(http_header);
+  SmartBuffer buf(bytes);
+  EXPECT_TRUE(ContainsIppHeader(buf));
+}
+
+TEST(ContainsIppHeader, NoHeader) {
+  const std::string http_header = "POST /ipp/print HTTP/1.1\x0d\x0a\x0d\x0a";
+
+  std::vector<uint8_t> bytes = CreateByteVector(http_header);
+  SmartBuffer buf(bytes);
+  EXPECT_FALSE(ContainsIppHeader(buf));
+}
+
+// Test that we can extract the IPP header from a message with an HTTP chunk
+// header.
+TEST(GetIppHeader, HttpChunkedHeader) {
+  const std::string http_header =
+      "Transfer-Encoding: chunked\x0d\x0a\x0d\x0a"
+      // Chunk header.
+      "8\x0d\x0a"
+      // Chunk contents.
+      "\x02\x00\x00\x06\x00\x00\x00\x05"s;
+
+  std::vector<uint8_t> bytes = CreateByteVector(http_header);
+  SmartBuffer buf(bytes);
+  IppHeader ipp_header = GetIppHeader(buf);
+
+  EXPECT_EQ(ipp_header.major, 2);
+  EXPECT_EQ(ipp_header.minor, 0);
+  EXPECT_EQ(ipp_header.operation_id, 0x0006);
+  EXPECT_EQ(ipp_header.request_id, 5);
+}
+
+// Test that we can extract the IPP header from a message that has no HTTP
+// header.
+TEST(GetIppHeader, NoHttpHeader) {
+  std::vector<uint8_t> message = {0x02, 0x00, 0x00, 0x06, 0x00, 0x00,
+                                  0x00, 0x07, 0x00, 0x01, 0x70, 0x29};
+  SmartBuffer buf(message);
+  IppHeader ipp_header = GetIppHeader(buf);
+
+  EXPECT_EQ(ipp_header.major, 2);
+  EXPECT_EQ(ipp_header.minor, 0);
+  EXPECT_EQ(ipp_header.operation_id, 0x0006);
+  EXPECT_EQ(ipp_header.request_id, 7);
+}
+
+TEST(ExtractChunkSize, ValidChunk) {
+  const std::string message =
+      "1c\r\n"
+      "hello world my name is david\r\n";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+  ssize_t chunk_size = ExtractChunkSize(message_buffer);
+  EXPECT_EQ(chunk_size, 0x1c);
+}
+
+TEST(ParseHttpChunkedMessage, MultipleChunks) {
+  const std::string message =
+      "4\r\n"
+      "test\r\n"
+      "5\r\n"
+      "chunk\r\n"
+      "0\r\n\r\n";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+
+  SmartBuffer chunk1 = ParseHttpChunkedMessage(&message_buffer);
+  const std::vector<uint8_t> expected1 = {'t', 'e', 's', 't'};
+  EXPECT_EQ(chunk1.contents(), expected1);
+
+  SmartBuffer chunk2 = ParseHttpChunkedMessage(&message_buffer);
+  const std::vector<uint8_t> expected2 = {'c', 'h', 'u', 'n', 'k'};
+  EXPECT_EQ(chunk2.contents(), expected2);
+
+  SmartBuffer chunk3 = ParseHttpChunkedMessage(&message_buffer);
+  EXPECT_EQ(chunk3.size(), 0);
+  EXPECT_EQ(message_buffer.size(), 0);
+}
+
+TEST(ProcessMessageChunks, ContainsHttpHeader) {
+  const std::string message =
+      "Transfer-Encoding: chunked\r\n\r\n"
+      "4\r\n"
+      "test\r\n";
+  SmartBuffer message_buffer;
+  message_buffer.Add(message);
+  // We expect ProcessMessageChunks to return true since |message| does not
+  // contain the final 0-length chunk.
+  EXPECT_TRUE(ProcessMessageChunks(&message_buffer));
+  EXPECT_EQ(message_buffer.size(), 0);
+}
+
+TEST(ProcessMessageChunks, MultipleChunks) {
+  const std::string message1 =
+      "4\r\n"
+      "test\r\n";
+  SmartBuffer message_buffer1;
+  message_buffer1.Add(message1);
+  // We expect ProcessMessageChunks to return true since |message| does not
+  // contain the final 0-length chunk.
+  EXPECT_TRUE(ProcessMessageChunks(&message_buffer1));
+  EXPECT_EQ(message_buffer1.size(), 0);
+
+  const std::string message2 =
+      "5\r\n"
+      "chunk\r\n"
+      "0\r\n\r\n";
+  SmartBuffer message_buffer2;
+  message_buffer2.Add(message2);
+  // We expect ProcessMessageChunks to return false since |message| contains the
+  // final 0-length chunk, and parsing should be completed.
+  EXPECT_FALSE(ProcessMessageChunks(&message_buffer2));
+  EXPECT_EQ(message_buffer2.size(), 0);
 }
 
 // Verify that GetHttpResponseHeader produces an HTTP header with the correct
@@ -804,7 +940,7 @@ TEST(AddResolution, ValidResolution) {
   EXPECT_EQ(expected, result.contents());
 }
 
-TEST(AddRange, InvalidResolution) {
+TEST(AddResolution, InvalidResolution) {
   // We expect this case to fail because the "value" field for the "resolution"
   // attribute is not a list.
   const std::string json_contents1 = R"(

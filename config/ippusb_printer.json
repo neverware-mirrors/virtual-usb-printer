@@ -52,14 +52,14 @@
           "bEndpointAddress": 1,
           "bmAttributes": 2,
           "wMaxPacketSize": 512,
-          "bInterval": 0
+          "bInterval": 255
 	}, {
           "bLength": 7,
           "bDescriptorType": 5,
           "bEndpointAddress": 130,
           "bmAttributes": 2,
           "wMaxPacketSize": 512,
-          "bInterval": 0
+          "bInterval": 255
 	}]
     }, {
         "bLength": 9,
@@ -77,14 +77,14 @@
           "bEndpointAddress": 3,
           "bmAttributes": 2,
           "wMaxPacketSize": 512,
-          "bInterval": 0
+          "bInterval": 255
         }, {
           "bLength": 7,
           "bDescriptorType": 5,
           "bEndpointAddress": 132,
           "bmAttributes": 2,
           "wMaxPacketSize": 512,
-          "bInterval": 0
+          "bInterval": 255
 	}]
     }],
     "language_descriptor": {

@@ -20,9 +20,9 @@
 #include "device_descriptors.h"
 #include "load_config.h"
 #include "server.h"
+#include "usb_printer.h"
 #include "usbip.h"
 #include "usbip_constants.h"
-#include "usb_printer.h"
 #include "value_util.h"
 
 namespace {
@@ -116,9 +116,15 @@ int main(int argc, char* argv[]) {
         GetAttributes(attributes.get(), kOperationAttributes);
     std::vector<IppAttribute> printer_attributes =
         GetAttributes(attributes.get(), kPrinterAttributes);
+    std::vector<IppAttribute> job_attributes =
+        GetAttributes(attributes.get(), kJobAttributes);
+    std::vector<IppAttribute> unsupported_attributes =
+        GetAttributes(attributes.get(), kUnsupportedAttributes);
 
     printer.SetOperationAttributes(operation_attributes);
     printer.SetPrinterAttributes(printer_attributes);
+    printer.SetJobAttributes(job_attributes);
+    printer.SetUnsupportedAttributes(unsupported_attributes);
   }
 
   RunServer(printer);

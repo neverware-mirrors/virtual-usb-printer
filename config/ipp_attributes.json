@@ -8,6 +8,27 @@
       "name": "attributes-natural-language",
       "value": "en-us"
   }],
+  "unsupportedAttributes": [{
+      "type": "unsupported",
+      "name": "cups-version",
+      "value": ""
+  }, {
+      "type": "unsupported",
+      "name": "job-password-encryption-supported",
+      "value": ""
+  }, {
+      "type": "unsupported",
+      "name": "marker-message",
+      "value": ""
+  }, {
+      "type": "unsupported",
+      "name": "printer-mandatory-job-attributes",
+      "value": ""
+  }, {
+      "type": "unsupported",
+      "name": "printer-state-message",
+      "value": ""
+  }],
   "printerAttributes": [{
       "type": "charset",
       "name": "charset-configured",
@@ -703,5 +724,121 @@
       "type": "no-value",
       "name": "printer-settable-attributes-supported",
       "value": ""
-  }]
+  }],
+ "jobAttributes": [
+  {
+   "type": "keyword",
+   "name": "compression-supplied",
+   "value": "none"
+  },
+  {
+   "type": "dateTime",
+   "name": "date-time-at-creation",
+   "value": [
+    7,
+    255,
+    11,
+    12,
+    11,
+    16,
+    18,
+    0,
+    45,
+    8,
+    0
+   ]
+  },
+  {
+   "type": "dateTime",
+   "name": "date-time-at-processing",
+   "value": [
+    7,
+    255,
+    11,
+    12,
+    11,
+    16,
+    18,
+    0,
+    45,
+    8,
+    0
+   ]
+  },
+  {
+   "type": "integer",
+   "name": "job-id",
+   "value": 2097086496
+  },
+  {
+   "type": "integer",
+   "name": "job-impressions",
+   "value": 0
+  },
+  {
+   "type": "integer",
+   "name": "job-impressions-completed",
+   "value": 0
+  },
+  {
+   "type": "integer",
+   "name": "job-k-octets-processed",
+   "value": 0
+  },
+  {
+   "type": "nameWithoutLanguage",
+   "name": "job-name",
+   "value": "Untitled"
+  },
+  {
+   "type": "nameWithoutLanguage",
+   "name": "job-originating-user-name",
+   "value": "anonymous"
+  },
+  {
+   "type": "integer",
+   "name": "job-printer-up-time",
+   "value": 16741128
+  },
+  {
+   "type": "uri",
+   "name": "job-printer-uri",
+   "value": "ipp://localhost:0/ipp/print"
+  },
+  {
+   "type": "enum",
+   "name": "job-state",
+   "value": 3
+  },
+  {
+   "type": "keyword",
+   "name": "job-state-reasons",
+   "value": "none"
+  },
+  {
+   "type": "uri",
+   "name": "job-uri",
+   "value": "ipp://localhost:0/ipp/print/2093547552"
+  },
+  {
+   "type": "uri",
+   "name": "job-uuid",
+   "value": "urn:uuid:6088f0bf-e66c-11e8-8a39-84ba3b9495e1"
+  },
+  {
+   "type": "integer",
+   "name": "time-at-completed",
+   "value": 0
+  },
+  {
+   "type": "integer",
+   "name": "time-at-creation",
+   "value": 16741128
+  },
+  {
+   "type": "integer",
+   "name": "time-at-processing",
+   "value": 16741128
+  }
+ ]
 }

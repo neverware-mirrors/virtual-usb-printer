@@ -99,9 +99,7 @@ void SendBuffer(int sockfd, const SmartBuffer& smart_buffer) {
     size_t sent_unsigned = static_cast<size_t>(sent);
     total += sent_unsigned;
     remaining -= sent_unsigned;
-    LOG(INFO) << "Sent " << sent_unsigned << " bytes";
   }
-  LOG(INFO) << "Sent " << total << " bytes total";
 }
 
 SmartBuffer ReceiveBuffer(int sockfd, size_t size) {
@@ -196,8 +194,9 @@ bool HandleUsbRequest(const UsbPrinter& printer, int connection) {
     printer.HandleUsbRequest(connection, command);
     return true;
   } else if (command.header.command == COMMAND_USBIP_CMD_UNLINK) {
-    LOG(INFO) << "Received unlink URB...shutting down";
-    return false;
+    LOG(INFO) << "Received unlink URB...ignoring";
+    LOG(INFO) << "Unlinked seqnum : " << command.transfer_flags;
+    return true;
   } else {
     LOG(ERROR) << "Unknown USBIP command " << command.header.command;
     return false;
@@ -209,10 +208,8 @@ void HandleConnection(const UsbPrinter& printer, base::ScopedFD connection) {
   bool attached = false;
   while (connection_open) {
     if (!attached) {
-      LOG(INFO) << "Handling USBIP OP request";
       connection_open = HandleOpRequest(printer, connection.get(), &attached);
     } else {
-      LOG(INFO) << "Handling USB request";
       connection_open = HandleUsbRequest(printer, connection.get());
     }
   }

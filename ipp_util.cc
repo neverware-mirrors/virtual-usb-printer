@@ -4,9 +4,6 @@
 
 #include "ipp_util.h"
 
-#include "smart_buffer.h"
-#include "usbip_constants.h"
-
 #include <map>
 #include <set>
 #include <string>
@@ -14,6 +11,9 @@
 #include <base/values.h>
 #include <cups/cups.h>
 #include <cups/ipp.h>
+
+#include "smart_buffer.h"
+#include "usbip_constants.h"
 
 namespace {
 
@@ -42,6 +42,17 @@ ssize_t FindFirstOccurrence(const SmartBuffer& message,
     return -1;
   }
   return std::distance(contents.begin(), iter);
+}
+
+// Determines if |message| starts with the string |target|.
+bool StartsWith(const SmartBuffer& message, const std::string& target) {
+  return FindFirstOccurrence(message, target) == 0;
+}
+
+bool MessageContains(const SmartBuffer& message,
+                     const std::string& s) {
+  ssize_t pos = FindFirstOccurrence(message, s);
+  return pos != -1;
 }
 
 // Adds the IPP |tag| to |buf|.
@@ -222,16 +233,112 @@ void PackIppHeader(IppHeader* header) {
   header->request_id = htonl(header->request_id);
 }
 
+bool IsHttpChunkedMessage(const SmartBuffer& message) {
+  ssize_t i = FindFirstOccurrence(message, "Transfer-Encoding: chunked");
+  return i != -1;
+}
+
+bool ContainsHttpHeader(const SmartBuffer& message) {
+  return MessageContains(message, "POST /ipp/print HTTP");
+}
+
+bool ContainsIppHeader(const SmartBuffer& message) {
+  CHECK(ContainsHttpHeader(message));
+  // If |message| contains an HTTP header, then any contents that immediately
+  // follow must be the IPP header. This checks to see that |message| has
+  // contents following the end of the HTTP header.
+  ssize_t pos = FindFirstOccurrence(message, "\r\n\r\n");
+  CHECK_GE(pos, 0) << "HTTP header does not contain end-of-header marker";
+  size_t start = pos + 4;
+  return start < message.size();
+}
+
 IppHeader GetIppHeader(const SmartBuffer& message) {
-  ssize_t start_of_header = FindFirstOccurrence(message, "\r\n\r\n");
-  CHECK_NE(start_of_header, -1)
-      << "The given message did not contain a valid HTTP header";
-  start_of_header += 4;  // Skip past the "\r\n\r\n" end of header string.
+  ssize_t i = FindFirstOccurrence(message, "\r\n\r\n");
+  size_t offset = 0;
+  if (i != -1) {
+    // If |message| starts with an HTTP header, jump to the beginning of the IPP
+    // message.
+    if (IsHttpChunkedMessage(message)) {
+      // If |message| is an HTTP chunked message header, jump to the beginning
+      // of the first chunk.
+      i = FindFirstOccurrence(message, "\r\n", i + 4);
+      offset = i + 2;
+    } else {
+      offset = i + 4;
+    }
+  }
   IppHeader header;
+  // Ensure that |message| has enough bytes to copy into |header|.
+  CHECK_GE(message.size(), offset);
+  CHECK_GE(message.size() - offset, sizeof(header));
   memset(&header, 0, sizeof(header));
-  memcpy(&header, message.data() + start_of_header, sizeof(header));
+  memcpy(&header, message.data() + offset, sizeof(header));
   UnpackIppHeader(&header);
   return header;
+}
+
+size_t ExtractChunkSize(const SmartBuffer& message) {
+  ssize_t end = FindFirstOccurrence(message, "\r\n");
+  if (end == -1) {
+    return 0;
+  }
+  std::string hex_string;
+  const std::vector<uint8_t>& contents = message.contents();
+  for (size_t i = 0; i < end; ++i) {
+    hex_string += static_cast<char>(contents[i]);
+  }
+  return std::stoll(hex_string, 0, 16);
+}
+
+SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message) {
+  CHECK_NE(message, nullptr) << "Given null message";
+  // If |message| starts with the trailing CRLF end-of-chunk indicator from the
+  // previous chunk then erase it.
+  if (StartsWith(*message, "\r\n")) {
+    message->Erase(0, 2);
+  }
+  size_t chunk_size = ExtractChunkSize(*message);
+  LOG(INFO) << "Chunk size: " << chunk_size;
+  ssize_t start = FindFirstOccurrence(*message, "\r\n");
+  SmartBuffer ret(0);
+  if (start == -1) {
+    return ret;
+  }
+  ret.Add(*message, start + 2, chunk_size);
+  // In case |message| contains multiple chunks, we remove the chunk which was
+  // just parsed.
+  //
+  // The length of the prefix to be deleted is calculated as follows:
+  // start      - represents the hex-encoded length value.
+  // chunk_size - the number of bytes read out for the message body.
+  // 2          - the CRLF characters which trail the length.
+  size_t to_erase_length = start + chunk_size + 2;
+  CHECK_GE(message->size(), to_erase_length);
+  message->Erase(0, to_erase_length);
+  // If |message| also contains the trailing CRLF end-of-chunk indicator, then
+  // erase it.
+  if (StartsWith(*message, "\r\n")) {
+    message->Erase(0, 2);
+  }
+
+  return ret;
+}
+
+bool ProcessMessageChunks(SmartBuffer* message) {
+  CHECK(message != nullptr) << "Process - Given null message";
+  if (IsHttpChunkedMessage(*message)) {
+    // If |message| contains an HTTP header then we discard it.
+    int start = FindFirstOccurrence(*message, "\r\n\r\n");
+    CHECK_GT(start, 0) << "Failed to process HTTP chunked message";
+    message->Erase(0, start + 4);
+  }
+
+  SmartBuffer chunk;
+  while (message->size() > 0) {
+    chunk = ParseHttpChunkedMessage(message);
+  }
+  return chunk.size() != 0;
 }
 
 std::string GetHttpResponseHeader(size_t size) {
@@ -276,7 +383,10 @@ std::vector<IppAttribute> GetAttributes(const base::Value* attributes,
 ipp_tag_t GetIppTag(const std::string& name) {
   std::map<std::string, ipp_tag_t> tags = {
       {kOperationAttributes, IPP_TAG_OPERATION},
+      {kUnsupportedAttributes, IPP_TAG_UNSUPPORTED_GROUP},
       {kPrinterAttributes, IPP_TAG_PRINTER},
+      {kJobAttributes, IPP_TAG_JOB},
+      {kUnsupported, IPP_TAG_UNSUPPORTED_VALUE},
       {kNoValue, IPP_TAG_NOVALUE},
       {kInteger, IPP_TAG_INTEGER},
       {kBoolean, IPP_TAG_BOOLEAN},
@@ -320,7 +430,8 @@ void AddPrinterAttributes(const std::vector<IppAttribute>& ipp_attributes,
                           const std::string& group, SmartBuffer* buf) {
   std::map<std::string,
            std::function<void(const IppAttribute&, SmartBuffer*)>>
-      function_map = {{kNoValue, AddString},
+      function_map = {{kUnsupported, AddString},
+                      {kNoValue, AddString},
                       {kInteger, AddInteger},
                       {kBoolean, AddBoolean},
                       {kEnum, AddInteger},
@@ -434,7 +545,8 @@ size_t GetRangeOfIntegerAttributeSize(const IppAttribute& attribute) {
 
 size_t GetAttributesSize(const std::vector<IppAttribute>& attributes) {
   std::map<std::string, std::function<size_t(const IppAttribute&)>>
-      function_map = {{kNoValue, GetStringAttributeSize},
+      function_map = {{kUnsupported, GetStringAttributeSize},
+                      {kNoValue, GetStringAttributeSize},
                       {kInteger, GetIntAttributeSize},
                       {kBoolean, GetBooleanAttributeSize},
                       {kEnum, GetIntAttributeSize},

@@ -23,9 +23,12 @@ constexpr char kValueKey[] = "value";
 
 // The names of the attribute groups.
 constexpr char kOperationAttributes[] = "operationAttributes";
+constexpr char kUnsupportedAttributes[] = "unsupportedAttributes";
 constexpr char kPrinterAttributes[] = "printerAttributes";
+constexpr char kJobAttributes[] = "jobAttributes";
 
 // The type names that can be seen in an ipp attribute.
+constexpr char kUnsupported[] = "unsupported";
 constexpr char kNoValue[] = "no-value";
 constexpr char kInteger[] = "integer";
 constexpr char kBoolean[] = "boolean";
@@ -91,6 +94,7 @@ class IppAttribute {
 struct IppHeader {
   uint8_t major;
   uint8_t minor;
+  // NOTE: operation_id is treated as a status value in an IPP response.
   uint16_t operation_id;
   int request_id;
 };
@@ -98,7 +102,23 @@ struct IppHeader {
 void PackIppHeader(IppHeader* header);
 void UnpackIppHeader(IppHeader* header);
 
+bool IsHttpChunkedMessage(const SmartBuffer& message);
+
+bool ContainsHttpHeader(const SmartBuffer& message);
+
+// Determines if |message| contains an IPP header.
+bool ContainsIppHeader(const SmartBuffer& message);
+
 IppHeader GetIppHeader(const SmartBuffer& message);
+
+size_t ExtractChunkSize(const SmartBuffer& message);
+
+SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message);
+
+// Extracts each of the messages chunks from |message|. Returns true if the
+// final "0-length" chunk has not been processed and there are still more chunks
+// to be received.
+bool ProcessMessageChunks(SmartBuffer* message);
 
 // Create a generic HTTP response header with the "Content-Length" field set to
 // |size|.

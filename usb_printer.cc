@@ -28,6 +28,9 @@
 
 namespace {
 
+// Represents the success code for an IPP response.
+const uint16_t kSuccessStatus = 0;
+
 // Bitmask constants used for extracting individual values out of
 // UsbControlRequest which is packed inside of a uint64_t.
 const uint64_t REQUEST_TYPE_MASK = (0xFFUL << 56);
@@ -64,6 +67,25 @@ UsbControlRequest CreateUsbControlRequest(long long setup) {
 
 }  // namespace
 
+void InterfaceManager::QueueMessage(const SmartBuffer& message) {
+  queue_.push(message);
+}
+
+bool InterfaceManager::QueueEmpty() const {
+  return queue_.empty();
+}
+
+void InterfaceManager::ChunkedMessageAdd(const SmartBuffer& message) {
+  chunked_message_.Add(message);
+}
+
+SmartBuffer InterfaceManager::PopMessage() {
+  CHECK(!QueueEmpty()) << "Can't pop message from empty queue.";
+  auto message = queue_.front();
+  queue_.pop();
+  return message;
+}
+
 // explicit
 UsbDescriptors::UsbDescriptors(
     const UsbDeviceDescriptor& device_descriptor,
@@ -84,7 +106,9 @@ UsbDescriptors::UsbDescriptors(
 
 // explicit
 UsbPrinter::UsbPrinter(const UsbDescriptors& usb_descriptors)
-    : usb_descriptors_(usb_descriptors), record_document_(false) {}
+    : usb_descriptors_(usb_descriptors),
+      record_document_(false),
+      interface_managers_(usb_descriptors.interface_descriptors().size()) {}
 
 bool UsbPrinter::IsIppUsb() const {
   int count = 0;
@@ -104,10 +128,8 @@ void UsbPrinter::HandleUsbRequest(int sockfd,
                                   const UsbipCmdSubmit& usb_request) const {
   // Endpoint 0 is used for USB control requests.
   if (usb_request.header.ep == 0) {
-    LOG(INFO) << "# Control Request";
     HandleUsbControl(sockfd, usb_request);
   } else {
-    LOG(INFO) << "# Data Request";
     if (usb_request.header.direction == 1) {
       HandleBulkInRequest(sockfd, usb_request);
     } else {
@@ -156,14 +178,64 @@ void UsbPrinter::HandleUsbData(int sockfd,
 
 void UsbPrinter::HandleIppUsbData(int sockfd,
                                   const UsbipCmdSubmit& usb_request) const {
-  SmartBuffer smart_buffer =
+  SmartBuffer message =
       ReceiveBuffer(sockfd, usb_request.transfer_buffer_length);
-  size_t received = smart_buffer.size();
+  size_t received = message.size();
   LOG(INFO) << "Received " << received << " bytes";
   // Acknowledge receipt of BULK transfer.
   SendUsbDataResponse(sockfd, usb_request, received);
-  IppHeader ipp_header = GetIppHeader(smart_buffer);
+
+  if (IsHttpChunkedMessage(message)) {
+    CHECK(!GetReceivingChunked(usb_request.header.ep))
+        << "Received new chunked message before previous chunked message could "
+           "be completed";
+    SetReceivingChunked(usb_request.header.ep, true);
+  }
+
+  if (GetReceivingChunked(usb_request.header.ep)) {
+    HandleChunkedIppUsbData(sockfd, usb_request, &message);
+  } else {
+    IppHeader ipp_header = GetIppHeader(message);
+    HandleIppUsbData(sockfd, usb_request, ipp_header);
+  }
+}
+
+void UsbPrinter::HandleChunkedIppUsbData(int sockfd,
+                                         const UsbipCmdSubmit& usb_request,
+                                         SmartBuffer* message) const {
+  LOG(INFO) << "Handling chunked message...";
+  if (IsHttpChunkedMessage(*message)) {
+    // Exit in the case that |message| only contains the HTTP header.
+    if (!ContainsIppHeader(*message)) {
+      return;
+    }
+    SetChunkedIppHeader(usb_request.header.ep, GetIppHeader(*message));
+  }
+
+  bool keep_receiving = ProcessMessageChunks(message);
+  SetReceivingChunked(usb_request.header.ep, keep_receiving);
+
+  if (!keep_receiving) {
+    // The final chunk has been received.
+    const IppHeader& chunked_header =
+        GetChunkedIppHeader(usb_request.header.ep);
+    HandleIppUsbData(sockfd, usb_request, chunked_header);
+  }
+}
+
+void UsbPrinter::HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request,
+                                  const IppHeader& ipp_header) const {
   switch (ipp_header.operation_id) {
+    // TODO(valleau): Add the IPP operation IDs as constants.
+    case 0x0004:
+      HandleValidateJob(usb_request, ipp_header);
+      break;
+    case 0x0005:
+      HandleCreateJob(usb_request, ipp_header);
+      break;
+    case 0x0006:
+      HandleSendDocument(usb_request, ipp_header);
+      break;
     case IPP_GET_PRINTER_ATTRIBUTES:
       HandleGetPrinterAttributes(sockfd, usb_request, ipp_header);
       break;
@@ -229,19 +301,63 @@ base::File::Error UsbPrinter::FileError() const {
   return record_document_file_.error_details();
 }
 
-void UsbPrinter::QueueMessage(const SmartBuffer& message) const {
-  message_queue_.push(message);
+void UsbPrinter::QueueMessage(int ep, const SmartBuffer& message) const {
+  int index = GetInterfaceManagerIndex(ep);
+  interface_managers_[index].QueueMessage(message);
 }
 
-SmartBuffer UsbPrinter::PopMessage() const {
-  CHECK(!message_queue_.empty());
-  auto ret = message_queue_.front();
-  message_queue_.pop();
-  return ret;
+SmartBuffer UsbPrinter::PopMessage(int ep) const {
+  int index = GetInterfaceManagerIndex(ep);
+  return interface_managers_[index].PopMessage();
 }
 
-bool UsbPrinter::QueueEmpty() const {
-  return message_queue_.empty();
+bool UsbPrinter::QueueEmpty(int ep) const  {
+  int index = GetInterfaceManagerIndex(ep);
+  return interface_managers_[index].QueueEmpty();
+}
+
+void UsbPrinter::SetReceivingChunked(int ep, bool b) const {
+  int index = GetInterfaceManagerIndex(ep);
+  interface_managers_[index].SetReceivingChunked(b);
+}
+
+bool UsbPrinter::GetReceivingChunked(int ep) const {
+  int index = GetInterfaceManagerIndex(ep);
+  return interface_managers_[index].receiving_chunked();
+}
+
+void UsbPrinter::SetChunkedIppHeader(int ep,
+                                     const IppHeader& ipp_header) const {
+  int index = GetInterfaceManagerIndex(ep);
+  interface_managers_[index].SetChunkedIppHeader(ipp_header);
+}
+
+const IppHeader& UsbPrinter::GetChunkedIppHeader(int ep) const {
+  int index = GetInterfaceManagerIndex(ep);
+  return interface_managers_[index].chunked_ipp_header();
+}
+
+void UsbPrinter::ChunkedMessageAdd(int ep, const SmartBuffer& message) const {
+  int index = GetInterfaceManagerIndex(ep);
+  interface_managers_[index].ChunkedMessageAdd(message);
+}
+
+const SmartBuffer& UsbPrinter::GetChunkedMessage(int ep) const {
+  int index = GetInterfaceManagerIndex(ep);
+  return interface_managers_[index].chunked_message();
+}
+
+int UsbPrinter::GetInterfaceManagerIndex(int ep) const {
+  CHECK_GT(ep, 0) << "Received request on an invalid endpoint";
+  // Since each interface contains a pair of in/out endpoints, we perform this
+  // conversion in order to retrieve the corresponding interface number.
+  // Examples:
+  //   endpoints 1 and 2 both map to interface 0.
+  //   endpoints 3 and 4 both map to interface 1.
+  int index = (ep - 1) / 2;
+  CHECK_LT(index, interface_managers_.size())
+      << "Received request on an invalid endpoint";
+  return index;
 }
 
 void UsbPrinter::HandleGetStatus(
@@ -429,7 +545,7 @@ void UsbPrinter::HandleGetPrinterAttributes(
   printf("HandleGetPrinterAttributes %u\n", request_header.request_id);
 
   IppHeader response_header = request_header;
-  response_header.operation_id = 0;
+  response_header.operation_id = kSuccessStatus;
   size_t response_size = sizeof(response_header) +
                          GetAttributesSize(operation_attributes_) +
                          GetAttributesSize(printer_attributes_) + 1;
@@ -453,18 +569,66 @@ void UsbPrinter::QueueIppUsbResponse(
   http_message.Add(attributes_buffer);
 
   LOG(INFO) << "Queueing ipp response...";
-  QueueMessage(http_message);
+  QueueMessage(usb_request.header.ep, http_message);
+}
+
+void UsbPrinter::HandleValidateJob(const UsbipCmdSubmit& usb_request,
+                                   const IppHeader& request_header) const {
+  printf("HandleValidateJob %u\n", request_header.request_id);
+
+  IppHeader response_header = request_header;
+  response_header.operation_id = kSuccessStatus;
+  size_t response_size =
+      sizeof(response_header) + GetAttributesSize(operation_attributes_) + 1;
+  SmartBuffer buf(response_size);
+  AddIppHeader(response_header, &buf);
+  AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
+  AddEndOfAttributes(&buf);
+  QueueIppUsbResponse(usb_request, buf);
+}
+
+void UsbPrinter::HandleCreateJob(const UsbipCmdSubmit& usb_request,
+                                 const IppHeader& request_header) const {
+  printf("HandleCreateJob %u\n", request_header.request_id);
+
+  IppHeader response_header = request_header;
+  response_header.operation_id = kSuccessStatus;
+  size_t response_size = sizeof(response_header) +
+                         GetAttributesSize(operation_attributes_) +
+                         GetAttributesSize(job_attributes_) + 1;
+  SmartBuffer buf(response_size);
+  AddIppHeader(response_header, &buf);
+  AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
+  AddPrinterAttributes(job_attributes_, kJobAttributes, &buf);
+  AddEndOfAttributes(&buf);
+  QueueIppUsbResponse(usb_request, buf);
+}
+
+void UsbPrinter::HandleSendDocument(const UsbipCmdSubmit& usb_request,
+                                    const IppHeader& request_header) const {
+  printf("HandleSendDocument %u\n", request_header.request_id);
+
+  IppHeader response_header = request_header;
+  response_header.operation_id = kSuccessStatus;
+  size_t response_size = sizeof(response_header) +
+                         GetAttributesSize(operation_attributes_) +
+                         GetAttributesSize(job_attributes_) + 1;
+  SmartBuffer buf(response_size);
+  AddIppHeader(response_header, &buf);
+  AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
+  AddPrinterAttributes(job_attributes_, kJobAttributes, &buf);
+  AddEndOfAttributes(&buf);
+  QueueIppUsbResponse(usb_request, buf);
 }
 
 void UsbPrinter::HandleBulkInRequest(int sockfd,
                                      const UsbipCmdSubmit& usb_request) const {
-  if (QueueEmpty()) {
-    LOG(INFO) << "Queue is empty.";
+  if (QueueEmpty(usb_request.header.ep)) {
     SendUsbControlResponse(sockfd, usb_request, 0, 0);
     return;
   }
   LOG(INFO) << "Responding with queued message...";
-  SmartBuffer http_message = PopMessage();
+  SmartBuffer http_message = PopMessage(usb_request.header.ep);
 
   size_t max_size = usb_request.transfer_buffer_length;
 
@@ -482,7 +646,7 @@ void UsbPrinter::HandleBulkInRequest(int sockfd,
     leftover.Add(http_message, max_size);
     http_message.Shrink(max_size);
     LOG(INFO) << "Queueing leftover message...";
-    QueueMessage(leftover);
+    QueueMessage(usb_request.header.ep, leftover);
   }
   response_buffer.Add(http_message);
   SendBuffer(sockfd, response_buffer);

@@ -17,6 +17,46 @@
 
 #include <base/files/file.h>
 
+// This class is responsible for managing an ippusb interface of a printer. It
+// keeps track of whether or not the interface is currently in the process of
+// receiving a chunked IPP message, and queues up responses to IPP requests so
+// that they can be sent when a BULK IN request is received.
+class InterfaceManager {
+ public:
+  InterfaceManager() = default;
+
+  // Place the IPP response |message| on the end of |queue_|.
+  void QueueMessage(const SmartBuffer& message);
+
+  // Returns whether or not |queue_| is empty.
+  bool QueueEmpty() const;
+
+  // Returns the message at the front of |queue_| and removes it. If PopMessage
+  // is called when |queue_| is empty then the program will exit.
+  SmartBuffer PopMessage();
+
+  bool receiving_chunked() const { return receiving_chunked_; };
+  void SetReceivingChunked(bool b) { receiving_chunked_ = b; }
+
+  const IppHeader& chunked_ipp_header() const { return chunked_ipp_header_; }
+  void SetChunkedIppHeader(const IppHeader& ipp_header) {
+    chunked_ipp_header_ = ipp_header;
+  }
+
+  const SmartBuffer& chunked_message() const {
+    return chunked_message_;
+  }
+  void ChunkedMessageAdd(const SmartBuffer& message);
+
+ private:
+  std::queue<SmartBuffer> queue_;
+  // Represents whether the interface is currently receiving an HTTP "chunked"
+  // message.
+  bool receiving_chunked_;
+  IppHeader chunked_ipp_header_;
+  SmartBuffer chunked_message_;
+};
+
 // A grouping of the descriptors for a USB device.
 class UsbDescriptors {
  public:
@@ -143,6 +183,17 @@ class UsbPrinter {
     printer_attributes_ = printer_attributes;
   }
 
+  void SetJobAttributes(const std::vector<IppAttribute>& job_attributes) {
+    job_attributes_ = job_attributes;
+  }
+
+  // TODO(valleau): Look into making these attributes dynamic as we should only
+  // report unsupported attributes if they were requested by the client.
+  void SetUnsupportedAttributes(
+      const std::vector<IppAttribute>& unsupported_attributes) {
+    unsupported_attributes_ = unsupported_attributes;
+  }
+
   // Determines whether |usb_request| is either a control or data request and
   // defers to the corresponding function.
   void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request) const;
@@ -154,6 +205,12 @@ class UsbPrinter {
   void HandleUsbData(int sockfd, const UsbipCmdSubmit& usb_request) const;
 
   void HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request) const;
+
+  void HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request,
+                        const IppHeader& ipp_header) const;
+
+  void HandleChunkedIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request,
+                               SmartBuffer* message) const;
 
   // Handles the standard USB requests.
   void HandleStandardControl(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -173,14 +230,29 @@ class UsbPrinter {
   // creation failed.
   base::File::Error FileError() const;
 
-  // Place |message| on the end of |message_queue_|.
-  void QueueMessage(const SmartBuffer& message) const;
+  // Enqueue |message| on the interface specified by |ep|.
+  void QueueMessage(int ep, const SmartBuffer& message) const;
 
-  // Pop the message from the front of |message_queue_|.
-  SmartBuffer PopMessage() const;
+  // Pop the IPP response message from the interface specified by |ep|.
+  SmartBuffer PopMessage(int ep) const;
 
-  // Returns whether or not |message_queue_| is empty.
-  bool QueueEmpty() const;
+  // Returns whether the response queue in the interface specified by |ep| is
+  // empty.
+  bool QueueEmpty(int ep) const;
+
+  // Marks whether the InterfaceManager corresponding to endpoint number |ep| is
+  // currently receiving a chunked HTTP message using |b|.
+  void SetReceivingChunked(int ep, bool b) const;
+
+  // Returns whether the interface specified by |ep| is currently receiving a
+  // chunked IPP message.
+  bool GetReceivingChunked(int ep) const;
+
+  void SetChunkedIppHeader(int ep, const IppHeader& ipp_header) const;
+  const IppHeader& GetChunkedIppHeader(int ep) const;
+
+  void ChunkedMessageAdd(int ep, const SmartBuffer& message) const;
+  const SmartBuffer& GetChunkedMessage(int ep) const;
 
  private:
   void HandleGetStatus(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -217,12 +289,21 @@ class UsbPrinter {
   void HandleGetDeviceId(int sockfd, const UsbipCmdSubmit& usb_request,
                          const UsbControlRequest& control_request) const;
 
+  // Write the document contained within |data| to |record_document_file_|.
   void WriteDocument(const SmartBuffer& data) const;
 
   void HandleGetPrinterAttributes(int sockfd, const UsbipCmdSubmit& usb_request,
                                   const IppHeader& ipp_header) const;
 
-  // Place a response to an IPP reqest onto |message_queue_|.
+  void HandleValidateJob(const UsbipCmdSubmit& usb_request,
+                         const IppHeader& request_header) const;
+
+  void HandleCreateJob(const UsbipCmdSubmit& usb_request,
+                       const IppHeader& request_header) const;
+
+  void HandleSendDocument(const UsbipCmdSubmit& usb_request,
+                          const IppHeader& request_header) const;
+
   void QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
                            const SmartBuffer& attributes_buffer) const;
 
@@ -230,16 +311,22 @@ class UsbPrinter {
   // |message_queue_|.
   void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request) const;
 
+  // Determines the index for the InterfaceManager that corresponds to the given
+  // endpoint number |ep|.
+  int GetInterfaceManagerIndex(int ep) const;
+
   UsbDescriptors usb_descriptors_;
+
   bool record_document_;
   std::string record_document_path_;
   mutable base::File record_document_file_;
 
   std::vector<IppAttribute> operation_attributes_;
   std::vector<IppAttribute> printer_attributes_;
+  std::vector<IppAttribute> job_attributes_;
+  std::vector<IppAttribute> unsupported_attributes_;
 
-  // Queue used to store IPP responses until they are requested from BULK_IN.
-  mutable std::queue<SmartBuffer> message_queue_;
+  mutable std::vector<InterfaceManager> interface_managers_;
 };
 
 #endif  // __USBIP_USB_PRINTER_H__

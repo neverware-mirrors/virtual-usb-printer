@@ -94,7 +94,6 @@ void SendUsbDataResponse(int sockfd, const UsbipCmdSubmit& usb_request,
   UsbipRetSubmit response = CreateUsbipRetSubmit(usb_request);
   response.actual_length = received;
 
-  LOG(INFO) << "Sending response:";
   PrintUsbipRetSubmit(response);
   size_t response_size = sizeof(response);
   PackUsbip((int*)&response, response_size);
@@ -109,7 +108,6 @@ void SendUsbControlResponse(int sockfd, const UsbipCmdSubmit& usb_request,
   UsbipRetSubmit response = CreateUsbipRetSubmit(usb_request);
   response.actual_length = data_size;
 
-  LOG(INFO) << "Sending response";
   PrintUsbipRetSubmit(response);
   size_t response_size = sizeof(response);
   PackUsbip((int*)&response, response_size);
