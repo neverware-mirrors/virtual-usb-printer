@@ -53,7 +53,7 @@ sockaddr_in BindServerSocket(int fd) {
   server.sin_addr.s_addr = htonl(INADDR_ANY);
   server.sin_port = htons(TCP_SERV_PORT);
 
-  if (bind(fd, (sockaddr *)&server, sizeof(server)) < 0) {
+  if (bind(fd, (sockaddr*)&server, sizeof(server)) < 0) {
     LOG(ERROR) << "Bind error: " << strerror(errno);
     exit(1);
   }
@@ -87,7 +87,7 @@ void ReportBoundAddress(sockaddr_in* server) {
   }
 }
 
-void SendBuffer(int sockfd, const SmartBuffer<uint8_t>& smart_buffer) {
+void SendBuffer(int sockfd, const SmartBuffer& smart_buffer) {
   size_t remaining = smart_buffer.size();
   size_t total = 0;
   while (remaining > 0) {
@@ -104,8 +104,8 @@ void SendBuffer(int sockfd, const SmartBuffer<uint8_t>& smart_buffer) {
   LOG(INFO) << "Sent " << total << " bytes total";
 }
 
-SmartBuffer<uint8_t> ReceiveBuffer(int sockfd, size_t size) {
-  SmartBuffer<uint8_t> smart_buffer(size);
+SmartBuffer ReceiveBuffer(int sockfd, size_t size) {
+  SmartBuffer smart_buffer(size);
   auto buf = std::make_unique<uint8_t[]>(size);
   size_t remaining = size;
   size_t total = 0;
@@ -128,7 +128,7 @@ void HandleDeviceList(int sockfd, const UsbPrinter& printer) {
   CreateOpRepDevlist(printer.device_descriptor(),
                      printer.configuration_descriptor(), printer.interfaces(),
                      &list);
-  SmartBuffer<uint8_t> packed_devlist = PackOpRepDevlist(list);
+  SmartBuffer packed_devlist = PackOpRepDevlist(list);
   free(list.interfaces);
   SendBuffer(sockfd, packed_devlist);
 }
@@ -147,12 +147,11 @@ void HandleAttach(int sockfd, const UsbPrinter& printer) {
   OpRepImport rep;
   CreateOpRepImport(printer.device_descriptor(),
                     printer.configuration_descriptor(), &rep);
-  SmartBuffer<uint8_t> packed_import = PackOpRepImport(rep);
+  SmartBuffer packed_import = PackOpRepImport(rep);
   SendBuffer(sockfd, packed_import);
 }
 
-bool HandleOpRequest(const UsbPrinter& printer,
-                     int connection,
+bool HandleOpRequest(const UsbPrinter& printer, int connection,
                      bool* attached) {
   // Read in the header first in order to determine whether the request is an
   // OpReqDevlist or an OpReqImport.

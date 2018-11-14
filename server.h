@@ -25,8 +25,8 @@ base::ScopedFD AcceptConnection(int);
 // format.
 void ReportBoundAddress(struct sockaddr_in* server);
 
-void SendBuffer(int sockfd, const SmartBuffer<uint8_t>& smart_buffer);
-SmartBuffer<uint8_t> ReceiveBuffer(int sockfd, size_t size);
+void SendBuffer(int sockfd, const SmartBuffer& smart_buffer);
+SmartBuffer ReceiveBuffer(int sockfd, size_t size);
 
 // Handles an OpReqDevlist request using |printer| to create an OpRepDevlist
 // message.

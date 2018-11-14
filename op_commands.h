@@ -129,11 +129,11 @@ void CreateOpRepImport(const UsbDeviceDescriptor& device,
 // Convert the various elements of an "OpRep" message into network
 // byte order and pack them into a SmartBuffer to be used for transferring along
 // a socket.
-SmartBuffer<uint8_t> PackOpHeader(OpHeader header);
-SmartBuffer<uint8_t> PackOpRepDevice(OpRepDevice device);
-SmartBuffer<uint8_t> PackOpRepDevlistHeader(OpRepDevlistHeader devlist_header);
-SmartBuffer<uint8_t> PackOpRepDevlist(OpRepDevlist devlist);
-SmartBuffer<uint8_t> PackOpRepImport(OpRepImport import);
+SmartBuffer PackOpHeader(OpHeader header);
+SmartBuffer PackOpRepDevice(OpRepDevice device);
+SmartBuffer PackOpRepDevlistHeader(OpRepDevlistHeader devlist_header);
+SmartBuffer PackOpRepDevlist(OpRepDevlist devlist);
+SmartBuffer PackOpRepImport(OpRepImport import);
 
 // Convert |header| into host uint8_t order.
 void UnpackOpHeader(OpHeader* header);

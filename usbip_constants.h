@@ -5,10 +5,6 @@
 #ifndef __USBIP_CONSTANTS_H__
 #define __USBIP_CONSTANTS_H__
 
-// Type definitions.
-#define byte unsigned char
-#define word unsigned short
-
 // USB Decriptor Type Constants.
 #define USB_DESCRIPTOR_DEVICE           0x01    // Device Descriptor.
 #define USB_DESCRIPTOR_CONFIGURATION    0x02    // Configuration Descriptor.

@@ -97,7 +97,7 @@ void SendUsbDataResponse(int sockfd, const UsbipCmdSubmit& usb_request,
   size_t response_size = sizeof(response);
   PackUsbip((int*)&response, response_size);
 
-  SmartBuffer<uint8_t> smart_buffer(response_size);
+  SmartBuffer smart_buffer(response_size);
   smart_buffer.Add(&response, response_size);
   SendBuffer(sockfd, smart_buffer);
 }
@@ -112,7 +112,7 @@ void SendUsbControlResponse(int sockfd, const UsbipCmdSubmit& usb_request,
   size_t response_size = sizeof(response);
   PackUsbip((int*)&response, response_size);
 
-  SmartBuffer<uint8_t> smart_buffer(response_size);
+  SmartBuffer smart_buffer(response_size);
   smart_buffer.Add(&response, response_size);
   if (data_size > 0) {
     smart_buffer.Add(data, data_size);

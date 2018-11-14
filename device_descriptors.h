@@ -28,6 +28,7 @@ struct UsbDeviceDescriptor {
         bDescriptorType(_bDescriptorType),
         bcdUSB(_bcdUSB),
         bDeviceClass(_bDeviceClass),
+        bDeviceSubClass(_bDeviceSubClass),
         bDeviceProtocol(_bDeviceProtocol),
         bMaxPacketSize0(_bMaxPacketSize0),
         idVendor(_idVendor),
