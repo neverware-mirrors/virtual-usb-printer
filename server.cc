@@ -126,8 +126,8 @@ void HandleDeviceList(int sockfd, const UsbPrinter& printer) {
   OpRepDevlist list;
   LOG(INFO) << "Listing devices...";
   CreateOpRepDevlist(printer.device_descriptor(),
-                     printer.configuration_descriptor(), printer.interfaces(),
-                     &list);
+                     printer.configuration_descriptor(),
+                     printer.interface_descriptors(), &list);
   SmartBuffer packed_devlist = PackOpRepDevlist(list);
   free(list.interfaces);
   SendBuffer(sockfd, packed_devlist);

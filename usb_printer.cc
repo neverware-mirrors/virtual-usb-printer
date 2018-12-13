@@ -62,21 +62,26 @@ UsbControlRequest CreateUsbControlRequest(long long setup) {
 }  // namespace
 
 // explicit
-UsbPrinter::UsbPrinter(
+UsbDescriptors::UsbDescriptors(
     const UsbDeviceDescriptor& device_descriptor,
     const UsbConfigurationDescriptor& configuration_descriptor,
     const UsbDeviceQualifierDescriptor& qualifier_descriptor,
-    const std::vector<std::vector<char>>& strings,
-    const std::vector<char> ieee_device_id,
-    const std::vector<UsbInterfaceDescriptor>& interfaces,
-    const std::map<uint8_t, std::vector<UsbEndpointDescriptor>>& endpoints)
+    const std::vector<std::vector<char>>& string_descriptors,
+    const std::vector<char>& ieee_device_id,
+    const std::vector<UsbInterfaceDescriptor>& interface_descriptors,
+    const std::map<uint8_t, std::vector<UsbEndpointDescriptor>>&
+        endpoint_descriptors)
     : device_descriptor_(device_descriptor),
       configuration_descriptor_(configuration_descriptor),
       qualifier_descriptor_(qualifier_descriptor),
-      strings_(strings),
+      string_descriptors_(string_descriptors),
       ieee_device_id_(ieee_device_id),
-      interfaces_(interfaces),
-      endpoints_(endpoints) {}
+      interface_descriptors_(interface_descriptors),
+      endpoint_descriptors_(endpoint_descriptors) {}
+
+// explicit
+UsbPrinter::UsbPrinter(const UsbDescriptors& usb_descriptors)
+    : usb_descriptors_(usb_descriptors) {}
 
 void UsbPrinter::HandleUsbRequest(int sockfd,
                                   const UsbipCmdSubmit& usb_request) const {
@@ -216,8 +221,8 @@ void UsbPrinter::HandleGetDeviceDescriptor(
   printf("HandleGetDeviceDescriptor %u[%u]\n", control_request.wValue1,
          control_request.wValue0);
 
-  SmartBuffer response(sizeof(device_descriptor_));
-  response.Add(&device_descriptor_, sizeof(device_descriptor_));
+  SmartBuffer response(sizeof(device_descriptor()));
+  response.Add(device_descriptor());
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
 }
 
@@ -228,9 +233,9 @@ void UsbPrinter::HandleGetConfigurationDescriptor(
          control_request.wValue0);
 
   SmartBuffer response(control_request.wLength);
-  response.Add(&configuration_descriptor_, sizeof(configuration_descriptor_));
+  response.Add(configuration_descriptor());
 
-  if (control_request.wLength == sizeof(configuration_descriptor_)) {
+  if (control_request.wLength == sizeof(configuration_descriptor())) {
     // Only the configuration descriptor itself has been requested.
     printf("Only configuration descriptor requested\n");
     SendUsbControlResponse(sockfd, usb_request, response.data(),
@@ -238,13 +243,16 @@ void UsbPrinter::HandleGetConfigurationDescriptor(
     return;
   }
 
+  const auto& interfaces = interface_descriptors();
+  const auto& endpoints = endpoint_descriptors();
+
   // Place each interface and their corresponding endnpoint descriptors into the
   // response buffer.
-  for (int i = 0; i < configuration_descriptor_.bNumInterfaces; ++i) {
-    const auto& interface = interfaces_[i];
+  for (int i = 0; i < configuration_descriptor().bNumInterfaces; ++i) {
+    const auto& interface = interfaces[i];
     response.Add(&interface, sizeof(interface));
-    auto iter = endpoints_.find(interface.bInterfaceNumber);
-    if (iter == endpoints_.end()) {
+    auto iter = endpoints.find(interface.bInterfaceNumber);
+    if (iter == endpoints.end()) {
       LOG(ERROR) << "Unable to find endpoints for interface "
                  << interface.bInterfaceNumber;
       exit(1);
@@ -267,8 +275,8 @@ void UsbPrinter::HandleGetDeviceQualifierDescriptor(
   printf("HandleGetDeviceQualifierDescriptor %u[%u]\n", control_request.wValue1,
          control_request.wValue0);
 
-  SmartBuffer response(sizeof(qualifier_descriptor_));
-  response.Add(&qualifier_descriptor_, sizeof(qualifier_descriptor_));
+  SmartBuffer response(sizeof(qualifier_descriptor()));
+  response.Add(qualifier_descriptor());
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
 }
 
@@ -279,8 +287,9 @@ void UsbPrinter::HandleGetStringDescriptor(
          control_request.wValue0);
 
   int index = control_request.wValue0;
-  SmartBuffer response(strings_[index][0]);
-  response.Add(strings_[index].data(), strings_[index][0]);
+  const auto& strings = string_descriptors();
+  SmartBuffer response(strings[index][0]);
+  response.Add(strings[index].data(), strings[index][0]);
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
 }
 
@@ -292,9 +301,10 @@ void UsbPrinter::HandleGetConfiguration(
 
   // Note: For now we only have one configuration set, so we just respond with
   // with |configuration_descriptor_.bConfigurationValue|.
-  SmartBuffer response(sizeof(configuration_descriptor_.bConfigurationValue));
-  response.Add(&configuration_descriptor_.bConfigurationValue,
-               sizeof(configuration_descriptor_.bConfigurationValue));
+  const auto& configuration = configuration_descriptor();
+  SmartBuffer response(sizeof(configuration.bConfigurationValue));
+  response.Add(&configuration.bConfigurationValue,
+               sizeof(configuration.bConfigurationValue));
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
 }
 
@@ -326,8 +336,8 @@ void UsbPrinter::HandleGetDeviceId(
   printf("HandleGetDeviceId %u[%u]\n", control_request.wValue1,
          control_request.wValue0);
 
-  SmartBuffer response(ieee_device_id_.size());
-  response.Add(ieee_device_id_.data(), ieee_device_id_.size());
+  SmartBuffer response(ieee_device_id().size());
+  response.Add(ieee_device_id());
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
 }
 

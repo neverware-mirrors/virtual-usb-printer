@@ -28,9 +28,10 @@ namespace {
 
 constexpr char kUsage[] = "virtual_usb_printer --descriptors_path=<path>";
 
-// Create a new UsbPrinter using the USB descriptors defined in
+// Create a new UsbDescriptors object using the USB descriptors defined in
 // |printer_config|.
-UsbPrinter CreatePrinter(const base::DictionaryValue* printer_config) {
+UsbDescriptors CreateUsbDescriptors(
+    const base::DictionaryValue* printer_config) {
   UsbDeviceDescriptor device = GetDeviceDescriptor(printer_config);
   UsbConfigurationDescriptor configuration =
       GetConfigurationDescriptor(printer_config);
@@ -43,8 +44,8 @@ UsbPrinter CreatePrinter(const base::DictionaryValue* printer_config) {
   std::vector<std::vector<char>> strings = GetStringDescriptors(printer_config);
   std::vector<char> ieee_device_id = GetIEEEDeviceId(printer_config);
 
-  return UsbPrinter(device, configuration, qualifier, strings, ieee_device_id,
-                    interfaces, endpoint_map);
+  return UsbDescriptors(device, configuration, qualifier, strings,
+                        ieee_device_id, interfaces, endpoint_map);
 }
 
 }  // namespace
@@ -81,6 +82,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  UsbPrinter printer = CreatePrinter(descriptors_dictionary);
+  UsbDescriptors usb_descriptors = CreateUsbDescriptors(descriptors_dictionary);
+  UsbPrinter printer(usb_descriptors);
   RunServer(printer);
 }
