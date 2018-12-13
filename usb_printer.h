@@ -13,6 +13,8 @@
 #include <map>
 #include <vector>
 
+#include <base/files/file.h>
+
 // A grouping of the descriptors for a USB device.
 class UsbDescriptors {
  public:
@@ -112,6 +114,8 @@ class UsbPrinter {
     return usb_descriptors_.endpoint_descriptors();
   }
 
+  std::string record_document_path() const { return record_document_path_; }
+
   // Determines whether |usb_request| is either a control or data request and
   // defers to the corresponding function.
   void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request) const;
@@ -129,6 +133,16 @@ class UsbPrinter {
   // Handles printer-specific USB requests.
   void HandlePrinterControl(int sockfd, const UsbipCmdSubmit& usb_request,
                             const UsbControlRequest& control_request) const;
+
+  // Sets |path| as the as the location to store documents received from print
+  // jobs. Sets |record_document_| to true to indicate that documents received
+  // in print jobs should now be recorded. Returns true if the creation of the
+  // file at |path| was successful.
+  bool SetupRecordDocument(const std::string& path);
+
+  // Returns the error from |record_document_file_|. Used to identify why file
+  // creation failed.
+  base::File::Error FileError() const;
 
  private:
   void HandleGetStatus(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -167,7 +181,12 @@ class UsbPrinter {
 
   void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request) const;
 
+  void WriteDocument(const SmartBuffer& data) const;
+
   UsbDescriptors usb_descriptors_;
+  bool record_document_;
+  std::string record_document_path_;
+  mutable base::File record_document_file_;
 };
 
 #endif  // __USBIP_USB_PRINTER_H__

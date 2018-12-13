@@ -21,6 +21,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <base/files/file.h>
+#include <base/files/file_path.h>
 #include <base/logging.h>
 
 namespace {
@@ -81,7 +83,7 @@ UsbDescriptors::UsbDescriptors(
 
 // explicit
 UsbPrinter::UsbPrinter(const UsbDescriptors& usb_descriptors)
-    : usb_descriptors_(usb_descriptors) {}
+    : usb_descriptors_(usb_descriptors), record_document_(false) {}
 
 void UsbPrinter::HandleUsbRequest(int sockfd,
                                   const UsbipCmdSubmit& usb_request) const {
@@ -122,12 +124,15 @@ void UsbPrinter::HandleUsbControl(int sockfd,
 
 void UsbPrinter::HandleUsbData(int sockfd,
                                const UsbipCmdSubmit& usb_request) const {
-  SmartBuffer smart_buffer =
-      ReceiveBuffer(sockfd, usb_request.transfer_buffer_length);
-  size_t received = smart_buffer.size();
+  SmartBuffer data = ReceiveBuffer(sockfd, usb_request.transfer_buffer_length);
+  size_t received = data.size();
   LOG(INFO) << "Received " << received << " bytes";
   // Acknowledge receipt of BULK transfer.
   SendUsbDataResponse(sockfd, usb_request, received);
+  if (record_document_) {
+    LOG(INFO) << "Recording document...";
+    WriteDocument(data);
+  }
 }
 
 void UsbPrinter::HandleStandardControl(
@@ -173,6 +178,18 @@ void UsbPrinter::HandlePrinterControl(
     default:
       LOG(ERROR) << "Unkown printer class request " << control_request.bRequest;
   }
+}
+
+bool UsbPrinter::SetupRecordDocument(const std::string& path) {
+  record_document_ = true;
+  record_document_path_ = path;
+  record_document_file_.Initialize(
+      base::FilePath(path), base::File::FLAG_CREATE | base::File::FLAG_APPEND);
+  return record_document_file_.IsValid();
+}
+
+base::File::Error UsbPrinter::FileError() const {
+  return record_document_file_.error_details();
 }
 
 void UsbPrinter::HandleGetStatus(
@@ -344,4 +361,17 @@ void UsbPrinter::HandleGetDeviceId(
 void UsbPrinter::HandleBulkInRequest(int sockfd,
                                      const UsbipCmdSubmit& usb_request) const {
   SendUsbControlResponse(sockfd, usb_request, 0, 0);
+}
+
+void UsbPrinter::WriteDocument(const SmartBuffer& data) const {
+  if (!record_document_file_.IsValid()) {
+    LOG(ERROR) << "File is invalid: " << record_document_path_;
+    LOG(ERROR) << "Error code: " << FileError();
+    exit(1);
+  }
+  int wrote = record_document_file_.Write(
+      0, reinterpret_cast<const char*>(data.data()), data.size());
+  if (wrote != data.size()) {
+    LOG(ERROR) << "Failed to write document to file: " << record_document_path_;
+  }
 }

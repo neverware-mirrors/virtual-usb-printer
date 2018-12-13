@@ -26,7 +26,8 @@
 
 namespace {
 
-constexpr char kUsage[] = "virtual_usb_printer --descriptors_path=<path>";
+constexpr char kUsage[] =
+    "virtual_usb_printer --descriptors_path=<path> [--record_doc_path=<path>]";
 
 // Create a new UsbDescriptors object using the USB descriptors defined in
 // |printer_config|.
@@ -52,6 +53,7 @@ UsbDescriptors CreateUsbDescriptors(
 
 int main(int argc, char* argv[]) {
   DEFINE_string(descriptors_path, "", "Path to descriptors JSON file");
+  DEFINE_string(record_doc_path, "", "Path to file to record document to");
 
   brillo::FlagHelper::Init(argc, argv, "Virtual USB Printer");
   brillo::InitLog(brillo::kLogToSyslog | brillo::kLogToStderrIfTty);
@@ -84,5 +86,11 @@ int main(int argc, char* argv[]) {
 
   UsbDescriptors usb_descriptors = CreateUsbDescriptors(descriptors_dictionary);
   UsbPrinter printer(usb_descriptors);
+  if (!FLAGS_record_doc_path.empty() &&
+      !printer.SetupRecordDocument(FLAGS_record_doc_path)) {
+    LOG(ERROR) << "Failed to open file: " << FLAGS_record_doc_path;
+    LOG(ERROR) << "Error code: " << printer.FileError();
+    return 1;
+  }
   RunServer(printer);
 }
