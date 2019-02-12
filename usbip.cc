@@ -4,6 +4,8 @@
 
 #include "usbip.h"
 
+#include <cinttypes>
+
 #include "device_descriptors.h"
 #include "server.h"
 #include "smart_buffer.h"
@@ -55,7 +57,7 @@ void PrintUsbipCmdSubmit(const UsbipCmdSubmit& command) {
   printf("usbip flags %u\n", command.transfer_flags);
   printf("usbip number of packets %u\n", command.number_of_packets);
   printf("usbip interval %u\n", command.interval);
-  printf("usbip setup %llu\n", command.setup);
+  printf("usbip setup %" PRIu64 "\n", command.setup);
   printf("usbip buffer length  %u\n", command.transfer_buffer_length);
 }
 
