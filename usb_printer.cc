@@ -33,13 +33,13 @@ const uint16_t kSuccessStatus = 0;
 
 // Bitmask constants used for extracting individual values out of
 // UsbControlRequest which is packed inside of a uint64_t.
-const uint64_t REQUEST_TYPE_MASK = (0xFFUL << 56);
-const uint64_t REQUEST_MASK = (0xFFUL << 48);
-const uint64_t VALUE_0_MASK = (0xFFUL << 40);
-const uint64_t VALUE_1_MASK = (0xFFUL << 32);
-const uint64_t INDEX_0_MASK = (0xFFUL << 24);
-const uint64_t INDEX_1_MASK = (0xFFUL << 16);
-const uint64_t LENGTH_MASK = 0xFFFFUL;
+const uint64_t REQUEST_TYPE_MASK{0xFFULL << 56};
+const uint64_t REQUEST_MASK{0xFFULL << 48};
+const uint64_t VALUE_0_MASK{0xFFULL << 40};
+const uint64_t VALUE_1_MASK{0xFFULL << 32};
+const uint64_t INDEX_0_MASK{0xFFUL << 24};
+const uint64_t INDEX_1_MASK{0xFFUL << 16};
+const uint64_t LENGTH_MASK{0xFFFFUL};
 
 // Returns the numeric value of the "type" stored within the |bmRequestType|
 // bitmap.

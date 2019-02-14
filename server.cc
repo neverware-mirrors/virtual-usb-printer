@@ -91,7 +91,7 @@ void SendBuffer(int sockfd, const SmartBuffer& smart_buffer) {
   size_t remaining = smart_buffer.size();
   size_t total = 0;
   while (remaining > 0) {
-    size_t to_send = std::min(remaining, 512UL);
+    size_t to_send = std::min<size_t>(remaining, 512UL);
     ssize_t sent =
         send(sockfd, smart_buffer.data() + total, to_send, MSG_NOSIGNAL);
     CHECK_GE(sent, 0) << "Failed to write data to socket";
@@ -108,7 +108,7 @@ SmartBuffer ReceiveBuffer(int sockfd, size_t size) {
   size_t remaining = size;
   size_t total = 0;
   while (total < size) {
-    size_t to_receive = std::min(remaining, 512UL);
+    size_t to_receive = std::min<size_t>(remaining, 512UL);
     ssize_t received = recv(sockfd, buf.get() + total, to_receive, 0);
     CHECK_GE(received, 0) << "Failed to receive data from socket";
     CHECK_GE(remaining, received) << "Received more data than expected";
