@@ -4,7 +4,6 @@
 
 #include "ipp_util.h"
 
-#include <cups/cups.h>
 #include <algorithm>
 #include <cstring>
 #include <vector>
@@ -14,6 +13,7 @@
 #include <base/json/json_reader.h>
 #include <base/values.h>
 
+#include "cups_constants.h"
 #include "smart_buffer.h"
 #include "value_util.h"
 
@@ -345,8 +345,8 @@ TEST(GetHttpResponseHeader, VerifyContentLength) {
 }
 
 TEST(GetIppTag, ValidTagName) {
-  EXPECT_EQ(GetIppTag(kInteger), IPP_TAG_INTEGER);
-  EXPECT_EQ(GetIppTag(kDateTime), IPP_TAG_DATE);
+  EXPECT_EQ(GetIppTag(kInteger), IppTag::INTEGER);
+  EXPECT_EQ(GetIppTag(kDateTime), IppTag::DATE);
 }
 
 TEST(GetIppTag, InvalidTagName) {

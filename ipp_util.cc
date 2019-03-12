@@ -8,9 +8,8 @@
 #include <set>
 #include <string>
 
+#include <arpa/inet.h>
 #include <base/values.h>
-#include <cups/cups.h>
-#include <cups/ipp.h>
 
 #include "smart_buffer.h"
 #include "usbip_constants.h"
@@ -56,9 +55,8 @@ bool MessageContains(const SmartBuffer& message,
 }
 
 // Adds the IPP |tag| to |buf|.
-void AddTag(ipp_tag_t tag, SmartBuffer* buf) {
-  CHECK_LE(tag, UCHAR_MAX) << "Tag value " << tag << " is too large";
-  uint8_t tag_value = tag;
+void AddTag(IppTag tag, SmartBuffer* buf) {
+  uint8_t tag_value = static_cast<uint8_t>(tag);
   buf->Add(&tag_value, sizeof(tag_value));
 }
 
@@ -78,14 +76,14 @@ void AddName(const std::string& name, bool include_name,
 
 // Adds the IPP |value_length| to |buf|.
 void AddValueLength(size_t value_length, SmartBuffer* buf) {
-  CHECK_LE(value_length, USHRT_MAX) << "Given value length is to large";
+  CHECK_LE(value_length, USHRT_MAX) << "Given value length is too large";
   uint16_t length = value_length;
   length = htons(length);
   buf->Add(&length, sizeof(length));
 }
 
 // Adds the IPP attribute of type bool to |buf|.
-void AddBooleanAttribute(bool value, ipp_tag_t tag, const std::string& name,
+void AddBooleanAttribute(bool value, IppTag tag, const std::string& name,
                          bool include_name, SmartBuffer* buf) {
   AddTag(tag, buf);
   AddName(name, include_name, buf);
@@ -94,7 +92,7 @@ void AddBooleanAttribute(bool value, ipp_tag_t tag, const std::string& name,
 }
 
 // Adds the IPP attribute of type int to |buf|.
-void AddIntAttribute(int value, ipp_tag_t tag, const std::string& name,
+void AddIntAttribute(int value, IppTag tag, const std::string& name,
                      bool include_name, SmartBuffer* buf) {
   AddTag(tag, buf);
   AddName(name, include_name, buf);
@@ -105,7 +103,7 @@ void AddIntAttribute(int value, ipp_tag_t tag, const std::string& name,
 }
 
 // Adds the IPP attribute of type string to |buf|.
-void AddStringAttribute(const std::string& value, ipp_tag_t tag,
+void AddStringAttribute(const std::string& value, IppTag tag,
                         const std::string& name, bool include_name,
                         SmartBuffer* buf) {
   AddTag(tag, buf);
@@ -411,31 +409,31 @@ std::vector<IppAttribute> GetAttributes(const base::Value* attributes,
   return GetAttributes(attributes_list);
 }
 
-ipp_tag_t GetIppTag(const std::string& name) {
-  std::map<std::string, ipp_tag_t> tags = {
-      {kOperationAttributes, IPP_TAG_OPERATION},
-      {kUnsupportedAttributes, IPP_TAG_UNSUPPORTED_GROUP},
-      {kPrinterAttributes, IPP_TAG_PRINTER},
-      {kJobAttributes, IPP_TAG_JOB},
-      {kUnsupported, IPP_TAG_UNSUPPORTED_VALUE},
-      {kNoValue, IPP_TAG_NOVALUE},
-      {kInteger, IPP_TAG_INTEGER},
-      {kBoolean, IPP_TAG_BOOLEAN},
-      {kEnum, IPP_TAG_ENUM},
-      {kOctetString, IPP_TAG_STRING},
-      {kDateTime, IPP_TAG_DATE},
-      {kResolution, IPP_TAG_RESOLUTION},
-      {kRangeOfInteger, IPP_TAG_RANGE},
-      {kBegCollection, IPP_TAG_BEGIN_COLLECTION},
-      {kEndCollection, IPP_TAG_END_COLLECTION},
-      {kTextWithoutLanguage, IPP_TAG_TEXT},
-      {kNameWithoutLanguage, IPP_TAG_NAME},
-      {kKeyword, IPP_TAG_KEYWORD},
-      {kUri, IPP_TAG_URI},
-      {kCharset, IPP_TAG_CHARSET},
-      {kNaturalLanguage, IPP_TAG_LANGUAGE},
-      {kMimeMediaType, IPP_TAG_MIMETYPE},
-      {kMemberAttrName, IPP_TAG_MEMBERNAME}};
+IppTag GetIppTag(const std::string& name) {
+  std::map<std::string, IppTag> tags = {
+      {kOperationAttributes, IppTag::OPERATION},
+      {kUnsupportedAttributes, IppTag::UNSUPPORTED_GROUP},
+      {kPrinterAttributes, IppTag::PRINTER},
+      {kJobAttributes, IppTag::JOB},
+      {kUnsupported, IppTag::UNSUPPORTED_VALUE},
+      {kNoValue, IppTag::NOVALUE},
+      {kInteger, IppTag::INTEGER},
+      {kBoolean, IppTag::BOOLEAN},
+      {kEnum, IppTag::ENUM},
+      {kOctetString, IppTag::STRING},
+      {kDateTime, IppTag::DATE},
+      {kResolution, IppTag::RESOLUTION},
+      {kRangeOfInteger, IppTag::RANGE},
+      {kBegCollection, IppTag::BEGIN_COLLECTION},
+      {kEndCollection, IppTag::END_COLLECTION},
+      {kTextWithoutLanguage, IppTag::TEXT},
+      {kNameWithoutLanguage, IppTag::NAME},
+      {kKeyword, IppTag::KEYWORD},
+      {kUri, IppTag::URI},
+      {kCharset, IppTag::CHARSET},
+      {kNaturalLanguage, IppTag::LANGUAGE},
+      {kMimeMediaType, IppTag::MIMETYPE},
+      {kMemberAttrName, IppTag::MEMBERNAME}};
   auto iter = tags.find(name);
   if (iter == tags.end()) {
     LOG(ERROR) << "Given unknown tag name " << name;
@@ -451,9 +449,8 @@ void AddIppHeader(const IppHeader& header, SmartBuffer* buf) {
 }
 
 void AddEndOfAttributes(SmartBuffer* buf) {
-  ipp_tag_t end_tag = IPP_TAG_END;
-  CHECK_LE(end_tag, UCHAR_MAX);
-  uint8_t tag_value = end_tag;
+  IppTag end_tag = IppTag::END;
+  uint8_t tag_value = static_cast<uint8_t>(end_tag);
   buf->Add(&tag_value, sizeof(tag_value));
 }
 
@@ -482,9 +479,8 @@ void AddPrinterAttributes(const std::vector<IppAttribute>& ipp_attributes,
                       {kMemberAttrName, AddString}};
 
   // Add attribute group tag.
-  ipp_tag_t group_tag = GetIppTag(group);
-  CHECK_LE(group_tag, UCHAR_MAX) << "Tag for " << group << " is too large";
-  uint8_t tag = group_tag;
+  IppTag group_tag = GetIppTag(group);
+  uint8_t tag = static_cast<uint8_t>(group_tag);
   buf->Add(&tag, sizeof(tag));
 
   for (const IppAttribute& attribute : ipp_attributes) {
@@ -609,7 +605,7 @@ size_t GetAttributesSize(const std::vector<IppAttribute>& attributes) {
 }
 
 void AddBoolean(const IppAttribute& attribute, SmartBuffer* buf) {
-  ipp_tag_t tag = GetIppTag(attribute.type());
+  IppTag tag = GetIppTag(attribute.type());
   const std::string name = attribute.name();
   if (attribute.IsList()) {
     std::vector<bool> values = attribute.GetBools();
@@ -625,7 +621,7 @@ void AddBoolean(const IppAttribute& attribute, SmartBuffer* buf) {
 }
 
 void AddInteger(const IppAttribute& attribute, SmartBuffer* buf) {
-  ipp_tag_t tag = GetIppTag(attribute.type());
+  IppTag tag = GetIppTag(attribute.type());
   const std::string name = attribute.name();
   if (attribute.IsList()) {
     std::vector<int> values = attribute.GetInts();
@@ -641,7 +637,7 @@ void AddInteger(const IppAttribute& attribute, SmartBuffer* buf) {
 }
 
 void AddString(const IppAttribute& attribute, SmartBuffer* buf) {
-  ipp_tag_t tag = GetIppTag(attribute.type());
+  IppTag tag = GetIppTag(attribute.type());
   const std::string name = attribute.name();
   if (attribute.IsList()) {
     std::vector<std::string> values = attribute.GetStrings();
@@ -657,7 +653,7 @@ void AddString(const IppAttribute& attribute, SmartBuffer* buf) {
 }
 
 void AddOctetString(const IppAttribute& attribute, SmartBuffer* buf) {
-  ipp_tag_t tag = GetIppTag(attribute.type());
+  IppTag tag = GetIppTag(attribute.type());
   const std::string name = attribute.name();
   if (attribute.IsList()) {
     std::vector<uint8_t> values = attribute.GetBytes();
@@ -672,7 +668,7 @@ void AddOctetString(const IppAttribute& attribute, SmartBuffer* buf) {
 }
 
 void AddDate(const IppAttribute& attribute, SmartBuffer* buf) {
-  ipp_tag_t tag = GetIppTag(attribute.type());
+  IppTag tag = GetIppTag(attribute.type());
   const std::string name = attribute.name();
   CHECK(attribute.IsList()) << "Date value is in an incorrect format";
 
@@ -685,7 +681,7 @@ void AddDate(const IppAttribute& attribute, SmartBuffer* buf) {
 }
 
 void AddRange(const IppAttribute& attribute, SmartBuffer* buf) {
-  ipp_tag_t tag = GetIppTag(attribute.type());
+  IppTag tag = GetIppTag(attribute.type());
   const std::string name = attribute.name();
 
   CHECK(attribute.IsList()) << "Range value is in an incorrect format";
@@ -704,7 +700,7 @@ void AddRange(const IppAttribute& attribute, SmartBuffer* buf) {
 }
 
 void AddResolution(const IppAttribute& attribute, SmartBuffer* buf) {
-  ipp_tag_t tag = GetIppTag(attribute.type());
+  IppTag tag = GetIppTag(attribute.type());
   const std::string name = attribute.name();
 
   CHECK(attribute.IsList()) << "Resolution value is in an incorrect format";

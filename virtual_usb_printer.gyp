@@ -12,6 +12,7 @@
       'target_name': 'virtual-usb-printer',
       'type': 'executable',
       'sources': [
+        'cups_constants.cc',
         'device_descriptors.cc',
         'ipp_util.cc',
         'load_config.cc',
@@ -22,9 +23,6 @@
         'usb_printer.cc',
         'value_util.cc',
         'virtual_usb_printer.cc',
-      ],
-      'libraries': [
-        '-lcups',
       ],
     },
   ],
@@ -43,13 +41,11 @@
             ],
           },
           'sources': [
+            'cups_constants.cc',
             'ipp_util.cc',
             'ipp_test.cc',
             'smart_buffer.cc',
             'value_util.cc',
-          ],
-          'libraries': [
-            '-lcups',
           ],
         },
         {

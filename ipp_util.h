@@ -5,16 +5,15 @@
 #ifndef __IPP_UTIL_H__
 #define __IPP_UTIL_H__
 
-#include "smart_buffer.h"
-#include "usbip_constants.h"
-
 #include <cstring>
 #include <string>
 #include <vector>
 
 #include <base/values.h>
-#include <cups/cups.h>
-#include <cups/ipp.h>
+
+#include "cups_constants.h"
+#include "smart_buffer.h"
+#include "usbip_constants.h"
 
 // The JSON keys we expect to see in an IPP attribute object.
 constexpr char kTypeKey[] = "type";
@@ -149,7 +148,7 @@ std::vector<IppAttribute> GetAttributes(const base::Value* attributes,
                                         const std::string& key);
 
 // Converts the |name| of a tag into its corresponding value from cups.
-ipp_tag_t GetIppTag(const std::string& group);
+IppTag GetIppTag(const std::string& group);
 
 void AddIppHeader(const IppHeader& header, SmartBuffer* buf);
 

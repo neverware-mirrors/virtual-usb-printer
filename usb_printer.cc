@@ -4,13 +4,6 @@
 
 #include "usb_printer.h"
 
-#include "device_descriptors.h"
-#include "ipp_util.h"
-#include "server.h"
-#include "smart_buffer.h"
-#include "usbip.h"
-#include "usbip_constants.h"
-
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -18,13 +11,19 @@
 #include <vector>
 
 #include <arpa/inet.h>
-#include <cups/cups.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include <base/files/file.h>
 #include <base/files/file_path.h>
 #include <base/logging.h>
+
+#include "device_descriptors.h"
+#include "ipp_util.h"
+#include "server.h"
+#include "smart_buffer.h"
+#include "usbip.h"
+#include "usbip_constants.h"
 
 namespace {
 
@@ -238,21 +237,20 @@ void UsbPrinter::HandleChunkedIppUsbData(int sockfd,
 void UsbPrinter::HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request,
                                   const IppHeader& ipp_header) const {
   switch (ipp_header.operation_id) {
-    // TODO(valleau): Add the IPP operation IDs as constants.
-    case 0x0004:
+    case IPP_VALIDATE_JOB:
       HandleValidateJob(usb_request, ipp_header);
       break;
-    case 0x0005:
+    case IPP_CREATE_JOB:
       HandleCreateJob(usb_request, ipp_header);
       break;
-    case 0x0006:
+    case IPP_SEND_DOCUMENT:
       HandleSendDocument(usb_request, ipp_header);
+      break;
+    case IPP_GET_JOB_ATTRIBUTES:
+      HandleGetJobAttributes(usb_request, ipp_header);
       break;
     case IPP_GET_PRINTER_ATTRIBUTES:
       HandleGetPrinterAttributes(sockfd, usb_request, ipp_header);
-      break;
-    case 0x0009:
-      HandleGetJobAttributes(usb_request, ipp_header);
       break;
     default:
       LOG(ERROR) << "Unknown operation id in ipp request "
