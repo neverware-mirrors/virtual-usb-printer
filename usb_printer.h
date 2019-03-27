@@ -297,11 +297,9 @@ class UsbPrinter {
   void HandleGetConfiguration(int sockfd, const UsbipCmdSubmit& usb_request,
                               const UsbControlRequest& control_request) const;
 
-  void HandleSetConfiguration(int sockfd, const UsbipCmdSubmit& usb_request,
-                              const UsbControlRequest& control_request) const;
-
-  void HandleSetInterface(int sockfd, const UsbipCmdSubmit& usb_request,
-                          const UsbControlRequest& control_request) const;
+  // Used to send an empty response to control requests which are not supported.
+  void HandleUnsupportedRequest(int sockfd, const UsbipCmdSubmit& usb_request,
+                                const UsbControlRequest& control_request) const;
 
   void HandleGetDeviceId(int sockfd, const UsbipCmdSubmit& usb_request,
                          const UsbControlRequest& control_request) const;

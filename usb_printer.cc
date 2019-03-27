@@ -268,21 +268,22 @@ void UsbPrinter::HandleStandardControl(
     case GET_DESCRIPTOR:
       HandleGetDescriptor(sockfd, usb_request, control_request);
       break;
-    case SET_DESCRIPTOR:
-      break;
     case GET_CONFIGURATION:
       HandleGetConfiguration(sockfd, usb_request, control_request);
       break;
+    case CLEAR_FEATURE:
+    case SET_FEATURE:
+    case SET_ADDRESS:
+    case SET_DESCRIPTOR:
     case SET_CONFIGURATION:
-      HandleSetConfiguration(sockfd, usb_request, control_request);
-      break;
     case GET_INTERFACE:
-      // Support for this will be needed for interfaces with alt settings.
-      break;
     case SET_INTERFACE:
-      HandleSetInterface(sockfd, usb_request, control_request);
+    case SET_FRAME:
+      HandleUnsupportedRequest(sockfd, usb_request, control_request);
       break;
     default:
+      LOG(ERROR) << "Received unknown control request "
+                 << control_request.bRequest;
       break;
   }
 }
@@ -441,7 +442,16 @@ void UsbPrinter::HandleGetDeviceDescriptor(
          control_request.wValue0);
 
   SmartBuffer response(sizeof(device_descriptor()));
-  response.Add(device_descriptor());
+  const UsbDeviceDescriptor& dev = device_descriptor();
+
+  // If the requested number of bytes is smaller than the size of the device
+  // descriptor then only send a portion of the descriptor.
+  if (control_request.wLength < sizeof(dev)) {
+    response.Add(&dev, control_request.wLength);
+  } else {
+    response.Add(dev);
+  }
+
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
 }
 
@@ -527,25 +537,11 @@ void UsbPrinter::HandleGetConfiguration(
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
 }
 
-void UsbPrinter::HandleSetConfiguration(
+void UsbPrinter::HandleUnsupportedRequest(
     int sockfd, const UsbipCmdSubmit& usb_request,
     const UsbControlRequest& control_request) const {
-  printf("HandleSetConfiguration %u[%u]\n", control_request.wValue1,
-         control_request.wValue0);
-
-  // NOTE: For now we have only one configuration to set, so we just respond
-  // with an empty message as a confirmation.
-  SendUsbControlResponse(sockfd, usb_request, 0, 0);
-}
-
-void UsbPrinter::HandleSetInterface(
-    int sockfd, const UsbipCmdSubmit& usb_request,
-    const UsbControlRequest& control_request) const {
-  printf("HandleSetInterface %u[%u]\n", control_request.wValue1,
-         control_request.wValue0);
-
-  // NOTE: For now we have only one interface to set, so we just respond
-  // with an empty message as a confirmation.
+  printf("HandleUnsupportedRequest %u: %u[%u]\n", control_request.bRequest,
+         control_request.wValue1, control_request.wValue0);
   SendUsbControlResponse(sockfd, usb_request, 0, 0);
 }
 
