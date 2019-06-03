@@ -371,7 +371,7 @@ TEST(ConvertStringToStringDescriptor, MaxLengthString) {
   EXPECT_EQ(result[1], USB_DESCRIPTOR_STRING);
   for (int i = 2; i < size; i += 2) {
     EXPECT_EQ(result[i], 's');
-    EXPECT_EQ(result[i], 0x00);
+    EXPECT_EQ(result[i+1], 0x00);
   }
 }
 
