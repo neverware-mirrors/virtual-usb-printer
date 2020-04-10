@@ -14,6 +14,7 @@
 #include <base/files/file_path.h>
 
 #include "device_descriptors.h"
+#include "escl_manager.h"
 #include "http_util.h"
 #include "ipp_manager.h"
 #include "smart_buffer.h"
@@ -127,7 +128,8 @@ class UsbPrinter {
  public:
   UsbPrinter(const UsbDescriptors& usb_descriptors,
              const base::FilePath& document_output_path,
-             IppManager ipp_manager);
+             IppManager ipp_manager,
+             EsclManager escl_manager);
 
   const UsbDeviceDescriptor& device_descriptor() const {
     return usb_descriptors_.device_descriptor();
@@ -238,6 +240,7 @@ class UsbPrinter {
   base::FilePath document_output_path_;
 
   IppManager ipp_manager_;
+  EsclManager escl_manager_;
   std::vector<InterfaceManager> interface_managers_;
 };
 

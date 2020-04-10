@@ -16,6 +16,7 @@
 #include <utility>
 
 #include <base/logging.h>
+#include <base/strings/string_util.h>
 
 #include "ipp_util.h"
 #include "server.h"
@@ -115,10 +116,12 @@ UsbDescriptors::UsbDescriptors(
 
 UsbPrinter::UsbPrinter(const UsbDescriptors& usb_descriptors,
                        const base::FilePath& document_output_path,
-                       IppManager ipp_manager)
+                       IppManager ipp_manager,
+                       EsclManager escl_manager)
     : usb_descriptors_(usb_descriptors),
       document_output_path_(document_output_path),
       ipp_manager_(std::move(ipp_manager)),
+      escl_manager_(std::move(escl_manager)),
       interface_managers_(usb_descriptors.interface_descriptors().size()) {}
 
 bool UsbPrinter::IsIppUsb() const {
@@ -315,6 +318,9 @@ HttpResponse UsbPrinter::GenerateHttpResponse(const HttpRequest& request,
     response.status = "200 OK";
     response.headers["Content-Type"] = "application/ipp";
     response.body = ipp_manager_.HandleIppRequest(ipp_header.value(), *body);
+  } else if (base::StartsWith(request.uri, "/eSCL",
+                              base::CompareCase::SENSITIVE)) {
+    response = escl_manager_.HandleEsclRequest(request);
   } else {
     LOG(ERROR) << "Invalid method '" << request.method << "' and/or endpoint '"
                << request.uri << "'";

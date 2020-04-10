@@ -179,3 +179,38 @@ TEST(ScannerCapabilities, AsXml) {
                       {"100", "200", "300"});
   xmlFreeDoc(doc);
 }
+
+TEST(HandleEsclRequest, InvalidEndpoint) {
+  HttpRequest request;
+  request.method = "GET";
+  request.uri = "/eSCL/InvalidEndpoint";
+
+  ScannerCapabilities caps;
+  EsclManager manager(caps);
+  HttpResponse response = manager.HandleEsclRequest(request);
+  EXPECT_EQ(response.status, "404 Not Found");
+  EXPECT_EQ(response.body.size(), 0);
+}
+
+// Tests that a GET request to /eSCL/ScannerCapabilities returns a valid XML
+// response.
+// TODO(b/157735732): add validation logic once we can.
+TEST(HandleEsclRequest, ScannerCapabilities) {
+  HttpRequest request;
+  request.method = "GET";
+  request.uri = "/eSCL/ScannerCapabilities";
+
+  base::Optional<ScannerCapabilities> caps =
+      CreateScannerCapabilitiesFromConfig(CreateCapabilitiesJson());
+  ASSERT_TRUE(caps);
+  EsclManager manager(caps.value());
+  HttpResponse response = manager.HandleEsclRequest(request);
+  EXPECT_EQ(response.status, "200 OK");
+  EXPECT_GT(response.body.size(), 0);
+
+  xmlDoc* doc =
+      xmlReadMemory(reinterpret_cast<const char*>(response.body.data()),
+                    response.body.size(), "noname.xml", NULL, 0);
+  EXPECT_NE(doc, nullptr);
+  xmlFreeDoc(doc);
+}

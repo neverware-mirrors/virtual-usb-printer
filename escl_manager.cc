@@ -8,6 +8,8 @@
 
 #include <base/logging.h>
 
+#include "xml_util.h"
+
 namespace {
 
 base::Optional<std::vector<std::string>> ExtractStringList(
@@ -127,3 +129,25 @@ base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
 
 EsclManager::EsclManager(ScannerCapabilities scanner_capabilities)
     : scanner_capabilities_(std::move(scanner_capabilities)) {}
+
+HttpResponse EsclManager::HandleEsclRequest(const HttpRequest& request) const {
+  if (request.method == "GET" && request.uri == "/eSCL/ScannerCapabilities") {
+    HttpResponse response;
+    response.status = "200 OK";
+    response.headers["Content-Type"] = "text/xml";
+    response.body.Add(ScannerCapabilitiesAsXml(scanner_capabilities_));
+    return response;
+  } else if (request.uri == "/eSCL/ScannerCapabilities") {
+    LOG(ERROR) << "Unexpected request method " << request.method
+               << " for endpoint " << request.uri;
+    HttpResponse response;
+    response.status = "405 Method Not Allowed";
+    return response;
+  } else {
+    LOG(ERROR) << "Unknown eSCL endpoint " << request.uri << " (method is "
+               << request.method << ")";
+    HttpResponse response;
+    response.status = "404 Not Found";
+    return response;
+  }
+}
