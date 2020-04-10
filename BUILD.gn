@@ -29,6 +29,7 @@ executable("virtual-usb-printer") {
   sources = [
     "cups_constants.cc",
     "device_descriptors.cc",
+    "ipp_manager.cc",
     "ipp_util.cc",
     "load_config.cc",
     "op_commands.cc",

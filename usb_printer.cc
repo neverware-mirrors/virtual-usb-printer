@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include <arpa/inet.h>
@@ -26,9 +27,6 @@
 #include "usbip_constants.h"
 
 namespace {
-
-// Represents the success code for an IPP response.
-const uint16_t kSuccessStatus = 0;
 
 // Bitmask constants used for extracting individual values out of
 // UsbControlRequest which is packed inside of a uint64_t.
@@ -104,9 +102,11 @@ UsbDescriptors::UsbDescriptors(
       endpoint_descriptors_(endpoint_descriptors) {}
 
 // explicit
-UsbPrinter::UsbPrinter(const UsbDescriptors& usb_descriptors)
+UsbPrinter::UsbPrinter(const UsbDescriptors& usb_descriptors,
+                       IppManager ipp_manager)
     : usb_descriptors_(usb_descriptors),
       record_document_(false),
+      ipp_manager_(std::move(ipp_manager)),
       interface_managers_(usb_descriptors.interface_descriptors().size()) {}
 
 bool UsbPrinter::IsIppUsb() const {
@@ -191,19 +191,19 @@ void UsbPrinter::HandleIppUsbData(int sockfd,
   }
 
   if (GetReceivingChunked(usb_request.header.ep)) {
-    HandleChunkedIppUsbData(sockfd, usb_request, &message);
+    HandleChunkedIppUsbData(usb_request, &message);
   } else {
     // If we receive an HTTP message with no body, then skip it.
     if (!ContainsHttpBody(message)) {
       return;
     }
     IppHeader ipp_header = GetIppHeader(message);
-    HandleIppUsbData(sockfd, usb_request, ipp_header);
+    SmartBuffer response = ipp_manager_.HandleIppRequest(ipp_header);
+    QueueIppUsbResponse(usb_request, response);
   }
 }
 
-void UsbPrinter::HandleChunkedIppUsbData(int sockfd,
-                                         const UsbipCmdSubmit& usb_request,
+void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
                                          SmartBuffer* message) const {
   int endpoint = usb_request.header.ep;
   if (IsHttpChunkedMessage(*message)) {
@@ -229,32 +229,8 @@ void UsbPrinter::HandleChunkedIppUsbData(int sockfd,
       WriteDocument(GetDocument(endpoint));
     }
     const IppHeader& chunked_header = GetChunkedIppHeader(endpoint);
-    HandleIppUsbData(sockfd, usb_request, chunked_header);
-  }
-}
-
-// TODO(valleau): Rename this function
-void UsbPrinter::HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request,
-                                  const IppHeader& ipp_header) const {
-  switch (ipp_header.operation_id) {
-    case IPP_VALIDATE_JOB:
-      HandleValidateJob(usb_request, ipp_header);
-      break;
-    case IPP_CREATE_JOB:
-      HandleCreateJob(usb_request, ipp_header);
-      break;
-    case IPP_SEND_DOCUMENT:
-      HandleSendDocument(usb_request, ipp_header);
-      break;
-    case IPP_GET_JOB_ATTRIBUTES:
-      HandleGetJobAttributes(usb_request, ipp_header);
-      break;
-    case IPP_GET_PRINTER_ATTRIBUTES:
-      HandleGetPrinterAttributes(sockfd, usb_request, ipp_header);
-      break;
-    default:
-      LOG(ERROR) << "Unknown operation id in ipp request "
-                 << ipp_header.operation_id;
+    SmartBuffer response = ipp_manager_.HandleIppRequest(chunked_header);
+    QueueIppUsbResponse(usb_request, response);
   }
 }
 
@@ -569,43 +545,6 @@ void UsbPrinter::WriteDocument(const SmartBuffer& data) const {
   }
 }
 
-void UsbPrinter::HandleGetPrinterAttributes(
-    int sockfd, const UsbipCmdSubmit& usb_request,
-    const IppHeader& request_header) const {
-  printf("HandleGetPrinterAttributes %u\n", request_header.request_id);
-
-  IppHeader response_header = request_header;
-  response_header.operation_id = kSuccessStatus;
-  // We add 1 to the size for the end of attributes tag.
-  size_t response_size = sizeof(response_header) +
-                         GetAttributesSize(operation_attributes_) +
-                         GetAttributesSize(printer_attributes_) + 1;
-  SmartBuffer buf(response_size);
-  AddIppHeader(response_header, &buf);
-  LOG(INFO) << "Adding operation attributes";
-  AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
-  LOG(INFO) << "Adding printer attributes";
-  AddPrinterAttributes(printer_attributes_, kPrinterAttributes, &buf);
-  AddEndOfAttributes(&buf);
-  QueueIppUsbResponse(usb_request, buf);
-}
-
-void UsbPrinter::HandleGetJobAttributes(const UsbipCmdSubmit& usb_request,
-                                        const IppHeader& request_header) const {
- IppHeader response_header = request_header;
- response_header.operation_id = kSuccessStatus;
- // We add 1 to the size for the end of attributes tag.
- size_t response_size = sizeof(response_header) +
-                        GetAttributesSize(operation_attributes_) +
-                        GetAttributesSize(job_attributes_) + 1;
- SmartBuffer buf(response_size);
- AddIppHeader(response_header, & buf);
- AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
- AddPrinterAttributes(job_attributes_, kJobAttributes, &buf);
- AddEndOfAttributes(&buf);
- QueueIppUsbResponse(usb_request, buf);
-}
-
 void UsbPrinter::QueueIppUsbResponse(
     const UsbipCmdSubmit& usb_request,
     const SmartBuffer& attributes_buffer) const {
@@ -617,58 +556,6 @@ void UsbPrinter::QueueIppUsbResponse(
 
   LOG(INFO) << "Queueing ipp response...";
   QueueMessage(usb_request.header.ep, http_message);
-}
-
-void UsbPrinter::HandleValidateJob(const UsbipCmdSubmit& usb_request,
-                                   const IppHeader& request_header) const {
-  printf("HandleValidateJob %u\n", request_header.request_id);
-
-  IppHeader response_header = request_header;
-  response_header.operation_id = kSuccessStatus;
-  // We add 1 to the size for the end of attributes tag.
-  size_t response_size =
-      sizeof(response_header) + GetAttributesSize(operation_attributes_) + 1;
-  SmartBuffer buf(response_size);
-  AddIppHeader(response_header, &buf);
-  AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
-  AddEndOfAttributes(&buf);
-  QueueIppUsbResponse(usb_request, buf);
-}
-
-void UsbPrinter::HandleCreateJob(const UsbipCmdSubmit& usb_request,
-                                 const IppHeader& request_header) const {
-  printf("HandleCreateJob %u\n", request_header.request_id);
-
-  IppHeader response_header = request_header;
-  response_header.operation_id = kSuccessStatus;
-  // We add 1 to the size for the end of attributes tag.
-  size_t response_size = sizeof(response_header) +
-                         GetAttributesSize(operation_attributes_) +
-                         GetAttributesSize(job_attributes_) + 1;
-  SmartBuffer buf(response_size);
-  AddIppHeader(response_header, &buf);
-  AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
-  AddPrinterAttributes(job_attributes_, kJobAttributes, &buf);
-  AddEndOfAttributes(&buf);
-  QueueIppUsbResponse(usb_request, buf);
-}
-
-void UsbPrinter::HandleSendDocument(const UsbipCmdSubmit& usb_request,
-                                    const IppHeader& request_header) const {
-  printf("HandleSendDocument %u\n", request_header.request_id);
-
-  IppHeader response_header = request_header;
-  response_header.operation_id = kSuccessStatus;
-  // We add 1 to the size for the end of attributes tag.
-  size_t response_size = sizeof(response_header) +
-                         GetAttributesSize(operation_attributes_) +
-                         GetAttributesSize(job_attributes_) + 1;
-  SmartBuffer buf(response_size);
-  AddIppHeader(response_header, &buf);
-  AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
-  AddPrinterAttributes(job_attributes_, kJobAttributes, &buf);
-  AddEndOfAttributes(&buf);
-  QueueIppUsbResponse(usb_request, buf);
 }
 
 void UsbPrinter::HandleBulkInRequest(int sockfd,

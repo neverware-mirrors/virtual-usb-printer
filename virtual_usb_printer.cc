@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <base/files/file_path.h>
@@ -18,6 +19,7 @@
 #include <brillo/syslog_logging.h>
 
 #include "device_descriptors.h"
+#include "ipp_manager.h"
 #include "load_config.h"
 #include "server.h"
 #include "usb_printer.h"
@@ -88,14 +90,8 @@ int main(int argc, char* argv[]) {
   }
 
   UsbDescriptors usb_descriptors = CreateUsbDescriptors(descriptors_dictionary);
-  UsbPrinter printer(usb_descriptors);
-  if (!FLAGS_record_doc_path.empty() &&
-      !printer.SetupRecordDocument(FLAGS_record_doc_path)) {
-    LOG(ERROR) << "Failed to open file: " << FLAGS_record_doc_path;
-    LOG(ERROR) << "Error code: " << printer.FileError();
-    return 1;
-  }
 
+  IppManager ipp_manager;
   // Load ipp attributes if |FLAGS_attributes_path| is set.
   std::unique_ptr<base::Value> attributes;
   if (!FLAGS_attributes_path.empty()) {
@@ -121,10 +117,16 @@ int main(int argc, char* argv[]) {
     std::vector<IppAttribute> unsupported_attributes =
         GetAttributes(attributes.get(), kUnsupportedAttributes);
 
-    printer.SetOperationAttributes(operation_attributes);
-    printer.SetPrinterAttributes(printer_attributes);
-    printer.SetJobAttributes(job_attributes);
-    printer.SetUnsupportedAttributes(unsupported_attributes);
+    ipp_manager = IppManager(operation_attributes, printer_attributes,
+                             job_attributes, unsupported_attributes);
+  }
+
+  UsbPrinter printer(usb_descriptors, std::move(ipp_manager));
+  if (!FLAGS_record_doc_path.empty() &&
+      !printer.SetupRecordDocument(FLAGS_record_doc_path)) {
+    LOG(ERROR) << "Failed to open file: " << FLAGS_record_doc_path;
+    LOG(ERROR) << "Error code: " << printer.FileError();
+    return 1;
   }
 
   RunServer(printer);

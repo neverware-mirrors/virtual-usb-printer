@@ -6,6 +6,7 @@
 #define __USBIP_USB_PRINTER_H__
 
 #include "device_descriptors.h"
+#include "ipp_manager.h"
 #include "ipp_util.h"
 #include "smart_buffer.h"
 #include "usbip.h"
@@ -136,7 +137,7 @@ class UsbDescriptors {
 // and printer-specific USB requests.
 class UsbPrinter {
  public:
-  explicit UsbPrinter(const UsbDescriptors& usb_descriptors);
+  UsbPrinter(const UsbDescriptors& usb_descriptors, IppManager ipp_manager);
 
   const UsbDeviceDescriptor& device_descriptor() const {
     return usb_descriptors_.device_descriptor();
@@ -176,35 +177,6 @@ class UsbPrinter {
   //    bInterfaceProtocol: 4
   bool IsIppUsb() const;
 
-  std::vector<IppAttribute> operation_attributes() const {
-    return operation_attributes_;
-  }
-
-  std::vector<IppAttribute> printer_attributes() const {
-    return printer_attributes_;
-  }
-
-  void SetOperationAttributes(
-      const std::vector<IppAttribute>& operation_attributes) {
-    operation_attributes_ = operation_attributes;
-  }
-
-  void SetPrinterAttributes(
-      const std::vector<IppAttribute>& printer_attributes) {
-    printer_attributes_ = printer_attributes;
-  }
-
-  void SetJobAttributes(const std::vector<IppAttribute>& job_attributes) {
-    job_attributes_ = job_attributes;
-  }
-
-  // TODO(valleau): Look into making these attributes dynamic as we should only
-  // report unsupported attributes if they were requested by the client.
-  void SetUnsupportedAttributes(
-      const std::vector<IppAttribute>& unsupported_attributes) {
-    unsupported_attributes_ = unsupported_attributes;
-  }
-
   // Determines whether |usb_request| is either a control or data request and
   // defers to the corresponding function.
   void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request) const;
@@ -217,10 +189,7 @@ class UsbPrinter {
 
   void HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request) const;
 
-  void HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request,
-                        const IppHeader& ipp_header) const;
-
-  void HandleChunkedIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request,
+  void HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
                                SmartBuffer* message) const;
 
   // Handles the standard USB requests.
@@ -307,21 +276,6 @@ class UsbPrinter {
   // Write the document contained within |data| to |record_document_file_|.
   void WriteDocument(const SmartBuffer& data) const;
 
-  void HandleGetPrinterAttributes(int sockfd, const UsbipCmdSubmit& usb_request,
-                                  const IppHeader& ipp_header) const;
-
-  void HandleValidateJob(const UsbipCmdSubmit& usb_request,
-                         const IppHeader& request_header) const;
-
-  void HandleCreateJob(const UsbipCmdSubmit& usb_request,
-                       const IppHeader& request_header) const;
-
-  void HandleSendDocument(const UsbipCmdSubmit& usb_request,
-                          const IppHeader& request_header) const;
-
-  void HandleGetJobAttributes(const UsbipCmdSubmit& usb_request,
-                              const IppHeader& request_header) const;
-
   void QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
                            const SmartBuffer& attributes_buffer) const;
 
@@ -339,11 +293,7 @@ class UsbPrinter {
   std::string record_document_path_;
   mutable base::File record_document_file_;
 
-  std::vector<IppAttribute> operation_attributes_;
-  std::vector<IppAttribute> printer_attributes_;
-  std::vector<IppAttribute> job_attributes_;
-  std::vector<IppAttribute> unsupported_attributes_;
-
+  IppManager ipp_manager_;
   mutable std::vector<InterfaceManager> interface_managers_;
 };
 
