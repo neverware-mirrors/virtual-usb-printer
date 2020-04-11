@@ -10,6 +10,7 @@ group("all") {
   ]
   if (use.test) {
     deps += [
+      ":ipp-manager-testrunner",
       ":ipp-util-testrunner",
       ":load-config-testrunner",
       ":smart-buffer-testrunner",
@@ -45,6 +46,23 @@ executable("virtual-usb-printer") {
 if (use.test) {
   pkg_config("test_config") {
     pkg_deps = [ "libchrome-test-${libbase_ver}" ]
+  }
+
+  executable("ipp-manager-testrunner") {
+    configs += [
+      "//common-mk:test",
+      ":target_defaults",
+      ":test_config",
+    ]
+    sources = [
+      "ipp_manager.cc",
+      "ipp_manager_test.cc",
+      "ipp_util.cc",
+      "smart_buffer.cc",
+    ]
+    deps = [
+      "//common-mk/testrunner",
+    ]
   }
 
   executable("ipp-util-testrunner") {
