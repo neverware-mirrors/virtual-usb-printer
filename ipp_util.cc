@@ -221,14 +221,28 @@ bool operator!=(const IppAttribute& lhs, const IppAttribute& rhs) {
   return !(lhs == rhs);
 }
 
-void UnpackIppHeader(IppHeader* header) {
-  header->operation_id = ntohs(header->operation_id);
-  header->request_id = ntohl(header->request_id);
+// static
+base::Optional<IppHeader> IppHeader::Deserialize(SmartBuffer* message) {
+  // Ensure that |message| has enough bytes to copy into |header|.
+  if (message->size() < sizeof(IppHeader))
+    return base::nullopt;
+
+  IppHeader header;
+  memset(&header, 0, sizeof(header));
+  memcpy(&header, message->data(), sizeof(header));
+
+  header.operation_id = ntohs(header.operation_id);
+  header.request_id = ntohl(header.request_id);
+
+  message->Erase(0, sizeof(header));
+  return header;
 }
 
-void PackIppHeader(IppHeader* header) {
-  header->operation_id = htons(header->operation_id);
-  header->request_id = htonl(header->request_id);
+void IppHeader::Serialize(SmartBuffer* buf) {
+  IppHeader header_copy = *this;
+  header_copy.operation_id = htons(header_copy.operation_id);
+  header_copy.request_id = htonl(header_copy.request_id);
+  buf->Add(&header_copy, sizeof(header_copy));
 }
 
 bool IsHttpChunkedMessage(const SmartBuffer& message) {
@@ -252,31 +266,6 @@ bool ContainsHttpBody(const SmartBuffer& message) {
   CHECK_GE(pos, 0) << "HTTP header does not contain end-of-header marker";
   size_t start = pos + 4;
   return start < message.size();
-}
-
-IppHeader GetIppHeader(const SmartBuffer& message) {
-  ssize_t i = FindFirstOccurrence(message, "\r\n\r\n");
-  size_t offset = 0;
-  if (i != -1) {
-    // If |message| starts with an HTTP header, jump to the beginning of the IPP
-    // message.
-    if (IsHttpChunkedMessage(message)) {
-      // If |message| is an HTTP chunked message header, jump to the beginning
-      // of the first chunk.
-      i = FindFirstOccurrence(message, "\r\n", i + 4);
-      offset = i + 2;
-    } else {
-      offset = i + 4;
-    }
-  }
-  IppHeader header;
-  // Ensure that |message| has enough bytes to copy into |header|.
-  CHECK_GE(message.size(), offset);
-  CHECK_GE(message.size() - offset, sizeof(header));
-  memset(&header, 0, sizeof(header));
-  memcpy(&header, message.data() + offset, sizeof(header));
-  UnpackIppHeader(&header);
-  return header;
 }
 
 size_t ExtractChunkSize(const SmartBuffer& message) {
@@ -440,12 +429,6 @@ IppTag GetIppTag(const std::string& name) {
     exit(1);
   }
   return iter->second;
-}
-
-void AddIppHeader(const IppHeader& header, SmartBuffer* buf) {
-  IppHeader header_copy = header;
-  PackIppHeader(&header_copy);
-  buf->Add(&header_copy, sizeof(header_copy));
 }
 
 void AddEndOfAttributes(SmartBuffer* buf) {

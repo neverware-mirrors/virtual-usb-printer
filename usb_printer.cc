@@ -197,8 +197,13 @@ void UsbPrinter::HandleIppUsbData(int sockfd,
     if (!ContainsHttpBody(message)) {
       return;
     }
-    IppHeader ipp_header = GetIppHeader(message);
-    SmartBuffer response = ipp_manager_.HandleIppRequest(ipp_header);
+
+    RemoveHttpHeader(&message);
+    base::Optional<IppHeader> ipp_header = IppHeader::Deserialize(&message);
+    if (!ipp_header) {
+      LOG(ERROR) << "IPP message does not contain a valid IPP header";
+    }
+    SmartBuffer response = ipp_manager_.HandleIppRequest(ipp_header.value());
     QueueIppUsbResponse(usb_request, response);
   }
 }
@@ -211,8 +216,12 @@ void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
     if (!ContainsHttpBody(*message)) {
       return;
     }
-    SetChunkedIppHeader(endpoint, GetIppHeader(*message));
     RemoveHttpHeader(message);
+    base::Optional<IppHeader> ipp_header = IppHeader::Deserialize(message);
+    if (!ipp_header) {
+      LOG(ERROR) << "IPP message does not contain a valid IPP header";
+    }
+    SetChunkedIppHeader(endpoint, ipp_header.value());
   }
 
   bool complete = ContainsFinalChunk(*message);

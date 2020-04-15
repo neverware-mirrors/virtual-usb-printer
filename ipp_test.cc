@@ -82,7 +82,12 @@ TEST(GetIppHeader, VerifyHeaderExtraction) {
   std::vector<uint8_t> bytes = CreateByteVector(http_header);
   SmartBuffer buffer(bytes);
 
-  IppHeader ipp_header = GetIppHeader(buffer);
+  // TODO(fletcherw): Convert this to deserialize and check the HTTP header
+  // as well once we've added a function for that.
+  RemoveHttpHeader(&buffer);
+  base::Optional<IppHeader> opt_ipp_header = IppHeader::Deserialize(&buffer);
+  EXPECT_TRUE(opt_ipp_header);
+  IppHeader ipp_header = opt_ipp_header.value();
 
   EXPECT_EQ(ipp_header.major, 2);
   EXPECT_EQ(ipp_header.minor, 0);
@@ -142,7 +147,6 @@ TEST(ContainsHttpBody, NoHttpHeader) {
 // header.
 TEST(GetIppHeader, HttpChunkedHeader) {
   const std::string http_header =
-      "Transfer-Encoding: chunked\x0d\x0a\x0d\x0a"
       // Chunk header.
       "8\x0d\x0a"
       // Chunk contents.
@@ -150,7 +154,13 @@ TEST(GetIppHeader, HttpChunkedHeader) {
 
   std::vector<uint8_t> bytes = CreateByteVector(http_header);
   SmartBuffer buf(bytes);
-  IppHeader ipp_header = GetIppHeader(buf);
+  SmartBuffer contents = ParseHttpChunkedMessage(&buf);
+  EXPECT_EQ(buf.size(), 0);
+
+  base::Optional<IppHeader> opt_ipp_header = IppHeader::Deserialize(&contents);
+  EXPECT_EQ(contents.size(), 0);
+  EXPECT_TRUE(opt_ipp_header);
+  IppHeader ipp_header = opt_ipp_header.value();
 
   EXPECT_EQ(ipp_header.major, 2);
   EXPECT_EQ(ipp_header.minor, 0);
@@ -164,12 +174,29 @@ TEST(GetIppHeader, NoHttpHeader) {
   std::vector<uint8_t> message = {0x02, 0x00, 0x00, 0x06, 0x00, 0x00,
                                   0x00, 0x07, 0x00, 0x01, 0x70, 0x29};
   SmartBuffer buf(message);
-  IppHeader ipp_header = GetIppHeader(buf);
+  base::Optional<IppHeader> opt_ipp_header = IppHeader::Deserialize(&buf);
+  EXPECT_TRUE(opt_ipp_header);
+  IppHeader ipp_header = opt_ipp_header.value();
 
   EXPECT_EQ(ipp_header.major, 2);
   EXPECT_EQ(ipp_header.minor, 0);
   EXPECT_EQ(ipp_header.operation_id, 0x0006);
   EXPECT_EQ(ipp_header.request_id, 7);
+}
+
+TEST(SerializeIppHeader, ValidHeader) {
+  IppHeader header;
+  header.major = 2;
+  header.minor = 0;
+  header.operation_id = 0x0009;
+  header.request_id = 0x22330077;
+
+  SmartBuffer buf;
+  header.Serialize(&buf);
+  EXPECT_EQ(buf.size(), sizeof(IppHeader));
+  std::vector<uint8_t> expected = {0x02, 0x00, 0x00, 0x09,
+                                   0x22, 0x33, 0x00, 0x77};
+  EXPECT_EQ(buf.contents(), expected);
 }
 
 TEST(ExtractChunkSize, ValidChunk) {
@@ -700,7 +727,7 @@ TEST(AddIppHeader, ValidHeader) {
   std::vector<uint8_t> expected = {0x02, 0x00, 0x00, 0x0b,
                                    0x00, 0x00, 0x00, 0x03};
   SmartBuffer result(expected.size());
-  AddIppHeader(header, &result);
+  header.Serialize(&result);
   EXPECT_EQ(expected, result.contents());
 }
 
