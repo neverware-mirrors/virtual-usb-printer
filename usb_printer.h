@@ -179,7 +179,7 @@ class UsbPrinter {
 
   // Determines whether |usb_request| is either a control or data request and
   // defers to the corresponding function.
-  void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request) const;
+  void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request);
 
   // Determines whether |usb_request| is either a standard or class-specific
   // control request and defers to the corresponding function.
@@ -187,10 +187,10 @@ class UsbPrinter {
 
   void HandleUsbData(int sockfd, const UsbipCmdSubmit& usb_request) const;
 
-  void HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request) const;
+  void HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request);
 
   void HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
-                               SmartBuffer* message) const;
+                               SmartBuffer* message);
 
   // Handles the standard USB requests.
   void HandleStandardControl(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -211,10 +211,10 @@ class UsbPrinter {
   base::File::Error FileError() const;
 
   // Enqueue |message| on the interface specified by |ep|.
-  void QueueMessage(int ep, const SmartBuffer& message) const;
+  void QueueMessage(int ep, const SmartBuffer& message);
 
   // Pop the IPP response message from the interface specified by |ep|.
-  SmartBuffer PopMessage(int ep) const;
+  SmartBuffer PopMessage(int ep);
 
   // Returns whether the response queue in the interface specified by |ep| is
   // empty.
@@ -222,22 +222,22 @@ class UsbPrinter {
 
   // Marks whether the InterfaceManager corresponding to endpoint number |ep| is
   // currently receiving a chunked HTTP message using |b|.
-  void SetReceivingChunked(int ep, bool b) const;
+  void SetReceivingChunked(int ep, bool b);
 
   // Returns whether the interface specified by |ep| is currently receiving a
   // chunked IPP message.
   bool GetReceivingChunked(int ep) const;
 
-  void SetChunkedIppHeader(int ep, const IppHeader& ipp_header) const;
+  void SetChunkedIppHeader(int ep, const IppHeader& ipp_header);
   const IppHeader& GetChunkedIppHeader(int ep) const;
 
-  void ChunkedMessageAdd(int ep, const SmartBuffer& message) const;
-  SmartBuffer* GetChunkedMessage(int ep) const;
+  void ChunkedMessageAdd(int ep, const SmartBuffer& message);
+  SmartBuffer* GetChunkedMessage(int ep);
 
-  void SetIppMessage(int ep, const SmartBuffer& ipp_message) const;
+  void SetIppMessage(int ep, const SmartBuffer& ipp_message);
   const SmartBuffer& GetIppMessage(int ep) const;
 
-  void SetDocument(int ep, const SmartBuffer& document) const;
+  void SetDocument(int ep, const SmartBuffer& document);
   const SmartBuffer& GetDocument(int ep) const;
 
  private:
@@ -277,11 +277,11 @@ class UsbPrinter {
   void WriteDocument(const SmartBuffer& data) const;
 
   void QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
-                           const SmartBuffer& attributes_buffer) const;
+                           const SmartBuffer& attributes_buffer);
 
   // Responds to a BULK_IN request by replying with the message at the front of
   // |message_queue_|.
-  void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request) const;
+  void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request);
 
   // Determines the index for the InterfaceManager that corresponds to the given
   // endpoint number |ep|.
@@ -291,10 +291,12 @@ class UsbPrinter {
 
   bool record_document_;
   std::string record_document_path_;
+  // Marked mutable because base::File::Write is not a const method, but it
+  // doesn't modify the File's state, apart from on the file system.
   mutable base::File record_document_file_;
 
   IppManager ipp_manager_;
-  mutable std::vector<InterfaceManager> interface_managers_;
+  std::vector<InterfaceManager> interface_managers_;
 };
 
 #endif  // __USBIP_USB_PRINTER_H__

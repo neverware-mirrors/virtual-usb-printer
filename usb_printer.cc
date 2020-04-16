@@ -124,7 +124,7 @@ bool UsbPrinter::IsIppUsb() const {
 }
 
 void UsbPrinter::HandleUsbRequest(int sockfd,
-                                  const UsbipCmdSubmit& usb_request) const {
+                                  const UsbipCmdSubmit& usb_request) {
   // Endpoint 0 is used for USB control requests.
   if (usb_request.header.ep == 0) {
     HandleUsbControl(sockfd, usb_request);
@@ -175,7 +175,7 @@ void UsbPrinter::HandleUsbData(int sockfd,
 }
 
 void UsbPrinter::HandleIppUsbData(int sockfd,
-                                  const UsbipCmdSubmit& usb_request) const {
+                                  const UsbipCmdSubmit& usb_request) {
   SmartBuffer message =
       ReceiveBuffer(sockfd, usb_request.transfer_buffer_length);
   size_t received = message.size();
@@ -209,7 +209,7 @@ void UsbPrinter::HandleIppUsbData(int sockfd,
 }
 
 void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
-                                         SmartBuffer* message) const {
+                                         SmartBuffer* message) {
   int endpoint = usb_request.header.ep;
   if (IsHttpChunkedMessage(*message)) {
     // Exit in the case that |message| only contains the HTTP header.
@@ -301,12 +301,12 @@ base::File::Error UsbPrinter::FileError() const {
   return record_document_file_.error_details();
 }
 
-void UsbPrinter::QueueMessage(int ep, const SmartBuffer& message) const {
+void UsbPrinter::QueueMessage(int ep, const SmartBuffer& message) {
   int index = GetInterfaceManagerIndex(ep);
   interface_managers_[index].QueueMessage(message);
 }
 
-SmartBuffer UsbPrinter::PopMessage(int ep) const {
+SmartBuffer UsbPrinter::PopMessage(int ep) {
   int index = GetInterfaceManagerIndex(ep);
   return interface_managers_[index].PopMessage();
 }
@@ -316,7 +316,7 @@ bool UsbPrinter::QueueEmpty(int ep) const  {
   return interface_managers_[index].QueueEmpty();
 }
 
-void UsbPrinter::SetReceivingChunked(int ep, bool b) const {
+void UsbPrinter::SetReceivingChunked(int ep, bool b) {
   int index = GetInterfaceManagerIndex(ep);
   interface_managers_[index].SetReceivingChunked(b);
 }
@@ -326,18 +326,17 @@ bool UsbPrinter::GetReceivingChunked(int ep) const {
   return interface_managers_[index].receiving_chunked();
 }
 
-void UsbPrinter::SetChunkedIppHeader(int ep,
-                                     const IppHeader& ipp_header) const {
+void UsbPrinter::SetChunkedIppHeader(int ep, const IppHeader& ipp_header) {
   int index = GetInterfaceManagerIndex(ep);
   interface_managers_[index].SetChunkedIppHeader(ipp_header);
 }
 
-void UsbPrinter::SetIppMessage(int ep, const SmartBuffer& ipp_message) const {
+void UsbPrinter::SetIppMessage(int ep, const SmartBuffer& ipp_message) {
   int index = GetInterfaceManagerIndex(ep);
   interface_managers_[index].SetIppMessage(ipp_message);
 }
 
-void UsbPrinter::SetDocument(int ep, const SmartBuffer& document) const {
+void UsbPrinter::SetDocument(int ep, const SmartBuffer& document) {
   int index = GetInterfaceManagerIndex(ep);
   interface_managers_[index].SetDocument(document);
 }
@@ -347,12 +346,12 @@ const IppHeader& UsbPrinter::GetChunkedIppHeader(int ep) const {
   return interface_managers_[index].chunked_ipp_header();
 }
 
-void UsbPrinter::ChunkedMessageAdd(int ep, const SmartBuffer& message) const {
+void UsbPrinter::ChunkedMessageAdd(int ep, const SmartBuffer& message) {
   int index = GetInterfaceManagerIndex(ep);
   interface_managers_[index].ChunkedMessageAdd(message);
 }
 
-SmartBuffer* UsbPrinter::GetChunkedMessage(int ep) const {
+SmartBuffer* UsbPrinter::GetChunkedMessage(int ep) {
   int index = GetInterfaceManagerIndex(ep);
   return interface_managers_[index].chunked_message();
 }
@@ -554,9 +553,8 @@ void UsbPrinter::WriteDocument(const SmartBuffer& data) const {
   }
 }
 
-void UsbPrinter::QueueIppUsbResponse(
-    const UsbipCmdSubmit& usb_request,
-    const SmartBuffer& attributes_buffer) const {
+void UsbPrinter::QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
+                                     const SmartBuffer& attributes_buffer) {
   const std::string http_header =
       GetHttpResponseHeader(attributes_buffer.size());
   SmartBuffer http_message(http_header.size());
@@ -568,7 +566,7 @@ void UsbPrinter::QueueIppUsbResponse(
 }
 
 void UsbPrinter::HandleBulkInRequest(int sockfd,
-                                     const UsbipCmdSubmit& usb_request) const {
+                                     const UsbipCmdSubmit& usb_request) {
   if (QueueEmpty(usb_request.header.ep)) {
     SendUsbControlResponse(sockfd, usb_request, 0, 0);
     return;
