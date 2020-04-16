@@ -37,7 +37,7 @@ class InterfaceManager {
   SmartBuffer PopMessage();
 
   bool receiving_chunked() const { return receiving_chunked_; };
-  void SetReceivingChunked(bool b) { receiving_chunked_ = b; }
+  void set_receiving_chunked(bool b) { receiving_chunked_ = b; }
 
   const IppHeader& chunked_ipp_header() const { return chunked_ipp_header_; }
   void SetChunkedIppHeader(const IppHeader& ipp_header) {
@@ -52,11 +52,6 @@ class InterfaceManager {
   const SmartBuffer& document() const { return document_; }
   void SetDocument(const SmartBuffer& document) { document_ = document; }
 
-  const SmartBuffer& ipp_message() const { return ipp_message_; }
-  void SetIppMessage(const SmartBuffer& ipp_message) {
-    ipp_message_ = ipp_message;
-  }
-
  private:
   std::queue<SmartBuffer> queue_;
   // Represents whether the interface is currently receiving an HTTP "chunked"
@@ -65,7 +60,6 @@ class InterfaceManager {
   IppHeader chunked_ipp_header_;
   SmartBuffer chunked_message_;
 
-  SmartBuffer ipp_message_;
   SmartBuffer document_;
 };
 
@@ -210,35 +204,8 @@ class UsbPrinter {
   // creation failed.
   base::File::Error FileError() const;
 
-  // Enqueue |message| on the interface specified by |ep|.
-  void QueueMessage(int ep, const SmartBuffer& message);
-
-  // Pop the IPP response message from the interface specified by |ep|.
-  SmartBuffer PopMessage(int ep);
-
-  // Returns whether the response queue in the interface specified by |ep| is
-  // empty.
-  bool QueueEmpty(int ep) const;
-
-  // Marks whether the InterfaceManager corresponding to endpoint number |ep| is
-  // currently receiving a chunked HTTP message using |b|.
-  void SetReceivingChunked(int ep, bool b);
-
-  // Returns whether the interface specified by |ep| is currently receiving a
-  // chunked IPP message.
-  bool GetReceivingChunked(int ep) const;
-
-  void SetChunkedIppHeader(int ep, const IppHeader& ipp_header);
-  const IppHeader& GetChunkedIppHeader(int ep) const;
-
-  void ChunkedMessageAdd(int ep, const SmartBuffer& message);
-  SmartBuffer* GetChunkedMessage(int ep);
-
-  void SetIppMessage(int ep, const SmartBuffer& ipp_message);
-  const SmartBuffer& GetIppMessage(int ep) const;
-
-  void SetDocument(int ep, const SmartBuffer& document);
-  const SmartBuffer& GetDocument(int ep) const;
+  // Get a pointer to the InterfaceManager that manages |endpoint|.
+  InterfaceManager* GetInterfaceManager(int endpoint);
 
  private:
   void HandleGetStatus(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -282,10 +249,6 @@ class UsbPrinter {
   // Responds to a BULK_IN request by replying with the message at the front of
   // |message_queue_|.
   void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request);
-
-  // Determines the index for the InterfaceManager that corresponds to the given
-  // endpoint number |ep|.
-  int GetInterfaceManagerIndex(int ep) const;
 
   UsbDescriptors usb_descriptors_;
 
