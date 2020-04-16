@@ -91,6 +91,8 @@ int main(int argc, char* argv[]) {
 
   UsbDescriptors usb_descriptors = CreateUsbDescriptors(descriptors_dictionary);
 
+  base::FilePath document_output_path(FLAGS_record_doc_path);
+
   IppManager ipp_manager;
   // Load ipp attributes if |FLAGS_attributes_path| is set.
   std::unique_ptr<base::Value> attributes;
@@ -117,17 +119,13 @@ int main(int argc, char* argv[]) {
     std::vector<IppAttribute> unsupported_attributes =
         GetAttributes(attributes.get(), kUnsupportedAttributes);
 
-    ipp_manager = IppManager(operation_attributes, printer_attributes,
-                             job_attributes, unsupported_attributes);
+    ipp_manager =
+        IppManager(operation_attributes, printer_attributes, job_attributes,
+                   unsupported_attributes, document_output_path);
   }
 
-  UsbPrinter printer(usb_descriptors, std::move(ipp_manager));
-  if (!FLAGS_record_doc_path.empty() &&
-      !printer.SetupRecordDocument(FLAGS_record_doc_path)) {
-    LOG(ERROR) << "Failed to open file: " << FLAGS_record_doc_path;
-    LOG(ERROR) << "Error code: " << printer.FileError();
-    return 1;
-  }
+  UsbPrinter printer(usb_descriptors, document_output_path,
+                     std::move(ipp_manager));
 
   Server server(std::move(printer));
   server.Run();

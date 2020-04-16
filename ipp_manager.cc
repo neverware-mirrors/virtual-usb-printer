@@ -4,6 +4,7 @@
 
 #include "ipp_manager.h"
 
+#include <base/files/file_util.h>
 #include <base/logging.h>
 
 const uint16_t IppManager::kSuccessStatus = 0;
@@ -11,20 +12,23 @@ const uint16_t IppManager::kSuccessStatus = 0;
 IppManager::IppManager(std::vector<IppAttribute> operation_attributes,
                        std::vector<IppAttribute> printer_attributes,
                        std::vector<IppAttribute> job_attributes,
-                       std::vector<IppAttribute> unsupported_attributes)
+                       std::vector<IppAttribute> unsupported_attributes,
+                       const base::FilePath& document_output_path)
     : operation_attributes_(operation_attributes),
       printer_attributes_(printer_attributes),
       job_attributes_(job_attributes),
-      unsupported_attributes_(unsupported_attributes) {}
+      unsupported_attributes_(unsupported_attributes),
+      document_output_path_(document_output_path) {}
 
-SmartBuffer IppManager::HandleIppRequest(const IppHeader& ipp_header) const {
+SmartBuffer IppManager::HandleIppRequest(const IppHeader& ipp_header,
+                                         const SmartBuffer& body) const {
   switch (ipp_header.operation_id) {
     case IPP_VALIDATE_JOB:
       return HandleValidateJob(ipp_header);
     case IPP_CREATE_JOB:
       return HandleCreateJob(ipp_header);
     case IPP_SEND_DOCUMENT:
-      return HandleSendDocument(ipp_header);
+      return HandleSendDocument(ipp_header, body);
     case IPP_GET_JOB_ATTRIBUTES:
       return HandleGetJobAttributes(ipp_header);
     case IPP_GET_PRINTER_ATTRIBUTES:
@@ -69,9 +73,20 @@ SmartBuffer IppManager::HandleCreateJob(const IppHeader& request_header) const {
   return buf;
 }
 
-SmartBuffer IppManager::HandleSendDocument(
-    const IppHeader& request_header) const {
+SmartBuffer IppManager::HandleSendDocument(const IppHeader& request_header,
+                                           const SmartBuffer& body) const {
   LOG(INFO) << "HandleSendDocument " << request_header.request_id;
+
+  if (!document_output_path_.empty()) {
+    LOG(INFO) << "Recording document...";
+    int written = base::WriteFile(document_output_path_,
+                                  reinterpret_cast<const char*>(body.data()),
+                                  body.size());
+    if (written != body.size()) {
+      PLOG(ERROR) << "Failed to write document to file: "
+                  << document_output_path_;
+    }
+  }
 
   IppHeader response_header = request_header;
   response_header.operation_id = kSuccessStatus;

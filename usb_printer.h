@@ -18,6 +18,7 @@
 #include <string>
 
 #include <base/files/file.h>
+#include <base/files/file_path.h>
 
 // This class is responsible for managing an ippusb interface of a printer. It
 // keeps track of whether or not the interface is currently in the process of
@@ -121,7 +122,9 @@ class UsbDescriptors {
 // and printer-specific USB requests.
 class UsbPrinter {
  public:
-  UsbPrinter(const UsbDescriptors& usb_descriptors, IppManager ipp_manager);
+  UsbPrinter(const UsbDescriptors& usb_descriptors,
+             const base::FilePath& document_output_path,
+             IppManager ipp_manager);
 
   const UsbDeviceDescriptor& device_descriptor() const {
     return usb_descriptors_.device_descriptor();
@@ -152,8 +155,6 @@ class UsbPrinter {
     return usb_descriptors_.endpoint_descriptors();
   }
 
-  std::string record_document_path() const { return record_document_path_; }
-
   // Returns true if this printer supports ipp-over-usb. An ippusb printer must
   // have at least 2 interfaces with the following values:
   //    bInterfaceClass: 7
@@ -183,16 +184,6 @@ class UsbPrinter {
   // Handles printer-specific USB requests.
   void HandlePrinterControl(int sockfd, const UsbipCmdSubmit& usb_request,
                             const UsbControlRequest& control_request) const;
-
-  // Sets |path| as the as the location to store documents received from print
-  // jobs. Sets |record_document_| to true to indicate that documents received
-  // in print jobs should now be recorded. Returns true if the creation of the
-  // file at |path| was successful.
-  bool SetupRecordDocument(const std::string& path);
-
-  // Returns the error from |record_document_file_|. Used to identify why file
-  // creation failed.
-  base::File::Error FileError() const;
 
   // Get a pointer to the InterfaceManager that manages |endpoint|.
   InterfaceManager* GetInterfaceManager(int endpoint);
@@ -230,9 +221,6 @@ class UsbPrinter {
   void HandleGetDeviceId(int sockfd, const UsbipCmdSubmit& usb_request,
                          const UsbControlRequest& control_request) const;
 
-  // Write the document contained within |data| to |record_document_file_|.
-  void WriteDocument(const SmartBuffer& data) const;
-
   void QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
                            const SmartBuffer& attributes_buffer);
 
@@ -241,12 +229,7 @@ class UsbPrinter {
   void HandleBulkInRequest(int sockfd, const UsbipCmdSubmit& usb_request);
 
   UsbDescriptors usb_descriptors_;
-
-  bool record_document_;
-  std::string record_document_path_;
-  // Marked mutable because base::File::Write is not a const method, but it
-  // doesn't modify the File's state, apart from on the file system.
-  mutable base::File record_document_file_;
+  base::FilePath document_output_path_;
 
   IppManager ipp_manager_;
   std::vector<InterfaceManager> interface_managers_;

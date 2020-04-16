@@ -7,6 +7,8 @@
 
 #include <vector>
 
+#include <base/files/file_path.h>
+
 #include "ipp_util.h"
 #include "smart_buffer.h"
 
@@ -18,11 +20,13 @@ class IppManager {
   IppManager(std::vector<IppAttribute> operation_attributes,
              std::vector<IppAttribute> printer_attributes,
              std::vector<IppAttribute> job_attributes,
-             std::vector<IppAttribute> unsupported_attributes);
+             std::vector<IppAttribute> unsupported_attributes,
+             const base::FilePath& document_output_path);
 
   // Returns a standard response based on the operation specified in
   // |ipp_header|.
-  SmartBuffer HandleIppRequest(const IppHeader& ipp_header) const;
+  SmartBuffer HandleIppRequest(const IppHeader& ipp_header,
+                               const SmartBuffer& body) const;
 
   // Result returned in the |operation_id| field of an IppHeader when the
   // operation was successful.
@@ -31,7 +35,8 @@ class IppManager {
  private:
   SmartBuffer HandleValidateJob(const IppHeader& request_header) const;
   SmartBuffer HandleCreateJob(const IppHeader& request_header) const;
-  SmartBuffer HandleSendDocument(const IppHeader& request_header) const;
+  SmartBuffer HandleSendDocument(const IppHeader& request_header,
+                                 const SmartBuffer& body) const;
   SmartBuffer HandleGetJobAttributes(const IppHeader& request_header) const;
   SmartBuffer HandleGetPrinterAttributes(const IppHeader& ipp_header) const;
 
@@ -44,6 +49,8 @@ class IppManager {
   // TODO(valleau): Look into making these attributes dynamic as we should only
   // report unsupported attributes if they were requested by the client.
   std::vector<IppAttribute> unsupported_attributes_;
+
+  base::FilePath document_output_path_;
 };
 
 #endif  // __IPP_MANAGER_H__

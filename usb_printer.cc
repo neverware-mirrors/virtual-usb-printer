@@ -16,8 +16,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <base/files/file.h>
-#include <base/files/file_path.h>
+#include <base/files/file_util.h>
 #include <base/logging.h>
 
 #include "device_descriptors.h"
@@ -103,11 +102,11 @@ UsbDescriptors::UsbDescriptors(
       interface_descriptors_(interface_descriptors),
       endpoint_descriptors_(endpoint_descriptors) {}
 
-// explicit
 UsbPrinter::UsbPrinter(const UsbDescriptors& usb_descriptors,
+                       const base::FilePath& document_output_path,
                        IppManager ipp_manager)
     : usb_descriptors_(usb_descriptors),
-      record_document_(false),
+      document_output_path_(document_output_path),
       ipp_manager_(std::move(ipp_manager)),
       interface_managers_(usb_descriptors.interface_descriptors().size()) {}
 
@@ -170,9 +169,15 @@ void UsbPrinter::HandleUsbData(int sockfd,
   LOG(INFO) << "Received " << received << " bytes";
   // Acknowledge receipt of BULK transfer.
   SendUsbDataResponse(sockfd, usb_request, received);
-  if (record_document_) {
+  if (!document_output_path_.empty()) {
     LOG(INFO) << "Recording document...";
-    WriteDocument(data);
+    int written = base::WriteFile(document_output_path_,
+                                  reinterpret_cast<const char*>(data.data()),
+                                  data.size());
+    if (written != data.size()) {
+      PLOG(ERROR) << "Failed to write document to file: "
+                  << document_output_path_;
+    }
   }
 }
 
@@ -201,7 +206,7 @@ void UsbPrinter::HandleIppUsbData(int sockfd,
       return;
     }
     IppHeader ipp_header = GetIppHeader(message);
-    SmartBuffer response = ipp_manager_.HandleIppRequest(ipp_header);
+    SmartBuffer response = ipp_manager_.HandleIppRequest(ipp_header, message);
     QueueIppUsbResponse(usb_request, response);
   }
 }
@@ -228,11 +233,8 @@ void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
       return;
     }
     RemoveIppAttributes(&payload);
-    if (record_document_) {
-      LOG(INFO) << "Recording document...";
-      WriteDocument(payload);
-    }
-    SmartBuffer response = ipp_manager_.HandleIppRequest(header.value());
+    SmartBuffer response =
+        ipp_manager_.HandleIppRequest(header.value(), payload);
     QueueIppUsbResponse(usb_request, response);
   }
 }
@@ -281,18 +283,6 @@ void UsbPrinter::HandlePrinterControl(
     default:
       LOG(ERROR) << "Unkown printer class request " << control_request.bRequest;
   }
-}
-
-bool UsbPrinter::SetupRecordDocument(const std::string& path) {
-  record_document_ = true;
-  record_document_path_ = path;
-  record_document_file_.Initialize(
-      base::FilePath(path), base::File::FLAG_CREATE | base::File::FLAG_APPEND);
-  return record_document_file_.IsValid();
-}
-
-base::File::Error UsbPrinter::FileError() const {
-  return record_document_file_.error_details();
 }
 
 InterfaceManager* UsbPrinter::GetInterfaceManager(int endpoint) {
@@ -467,19 +457,6 @@ void UsbPrinter::HandleGetDeviceId(
   SmartBuffer response(ieee_device_id().size());
   response.Add(ieee_device_id());
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
-}
-
-void UsbPrinter::WriteDocument(const SmartBuffer& data) const {
-  if (!record_document_file_.IsValid()) {
-    LOG(ERROR) << "File is invalid: " << record_document_path_;
-    LOG(ERROR) << "Error code: " << FileError();
-    exit(1);
-  }
-  int wrote = record_document_file_.Write(
-      0, reinterpret_cast<const char*>(data.data()), data.size());
-  if (wrote != data.size()) {
-    LOG(ERROR) << "Failed to write document to file: " << record_document_path_;
-  }
 }
 
 void UsbPrinter::QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
