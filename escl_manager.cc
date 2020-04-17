@@ -137,7 +137,14 @@ HttpResponse EsclManager::HandleEsclRequest(const HttpRequest& request) const {
     response.headers["Content-Type"] = "text/xml";
     response.body.Add(ScannerCapabilitiesAsXml(scanner_capabilities_));
     return response;
-  } else if (request.uri == "/eSCL/ScannerCapabilities") {
+  } else if (request.method == "GET" && request.uri == "/eSCL/ScannerStatus") {
+    HttpResponse response;
+    response.status = "200 OK";
+    response.headers["Content-Type"] = "text/xml";
+    response.body.Add(ScannerStatusAsXml(status_));
+    return response;
+  } else if (request.uri == "/eSCL/ScannerCapabilities" ||
+             request.uri == "/eSCL/ScannerStatus") {
     LOG(ERROR) << "Unexpected request method " << request.method
                << " for endpoint " << request.uri;
     HttpResponse response;

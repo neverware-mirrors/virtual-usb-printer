@@ -16,4 +16,7 @@
 // chosen.
 std::vector<uint8_t> ScannerCapabilitiesAsXml(const ScannerCapabilities& caps);
 
+// Returns a serialized eSCL ScannerStatus XML representation of |status|.
+std::vector<uint8_t> ScannerStatusAsXml(const ScannerStatus& status);
+
 #endif  // __XML_UTIL_H__

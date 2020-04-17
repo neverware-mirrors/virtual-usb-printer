@@ -145,3 +145,22 @@ std::vector<uint8_t> ScannerCapabilitiesAsXml(const ScannerCapabilities& caps) {
 
   return Serialize(std::move(root));
 }
+
+std::vector<uint8_t> ScannerStatusAsXml(const ScannerStatus& status) {
+  UniqueXmlNodePtr root(xmlNewNode(nullptr, XmlCast("ScannerStatus")));
+
+  xmlNs* scan = xmlNewNs(
+      root.get(), XmlCast("http://schemas.hp.com/imaging/escl/2011/05/03"),
+      XmlCast("scan"));
+  xmlNs* pwg =
+      xmlNewNs(root.get(), XmlCast("http://www.pwg.org/schemas/2010/12/sm"),
+               XmlCast("pwg"));
+  xmlNewNs(root.get(), XmlCast("http://www.w3.org/2001/XMLSchema-instance"),
+           XmlCast("xsi"));
+  xmlSetNs(root.get(), scan);
+
+  AddNodeWithContent(root.get(), pwg, "Version", "2.6.3");
+  AddNodeWithContent(root.get(), pwg, "State", status.idle ? "Idle" : "Busy");
+
+  return Serialize(std::move(root));
+}

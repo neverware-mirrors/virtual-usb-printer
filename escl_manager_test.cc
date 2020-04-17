@@ -214,3 +214,24 @@ TEST(HandleEsclRequest, ScannerCapabilities) {
   EXPECT_NE(doc, nullptr);
   xmlFreeDoc(doc);
 }
+
+// Tests that a GET request to /eSCL/ScannerStatus returns a valid XML
+// response.
+// TODO(b/157735732): add validation logic once we can.
+TEST(HandleEsclRequest, ScannerStatus) {
+  HttpRequest request;
+  request.method = "GET";
+  request.uri = "/eSCL/ScannerStatus";
+
+  ScannerCapabilities caps;
+  EsclManager manager(caps);
+  HttpResponse response = manager.HandleEsclRequest(request);
+  EXPECT_EQ(response.status, "200 OK");
+  EXPECT_GT(response.body.size(), 0);
+
+  xmlDoc* doc =
+      xmlReadMemory(reinterpret_cast<const char*>(response.body.data()),
+                    response.body.size(), "noname.xml", NULL, 0);
+  EXPECT_NE(doc, nullptr);
+  xmlFreeDoc(doc);
+}

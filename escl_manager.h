@@ -29,6 +29,10 @@ struct ScannerCapabilities {
 base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
     const base::Value& config);
 
+struct ScannerStatus {
+  bool idle;
+};
+
 // This class is responsible for generating responses to eSCL requests sent
 // over USB.
 class EsclManager {
@@ -43,6 +47,7 @@ class EsclManager {
 
  private:
   ScannerCapabilities scanner_capabilities_;
+  ScannerStatus status_;
 };
 
 #endif  // __ESCL_MANAGER_H__
