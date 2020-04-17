@@ -10,6 +10,7 @@ group("all") {
   ]
   if (use.test) {
     deps += [
+      ":escl-manager-testrunner",
       ":http-util-testrunner",
       ":ipp-util-testrunner",
       ":load-config-testrunner",
@@ -48,6 +49,23 @@ executable("virtual-usb-printer") {
 if (use.test) {
   pkg_config("test_config") {
     pkg_deps = [ "libchrome-test-${libbase_ver}" ]
+  }
+
+  executable("escl-manager-testrunner") {
+    configs += [
+      "//common-mk:test",
+      ":target_defaults",
+      ":test_config",
+    ]
+    sources = [
+      "escl_manager.cc",
+      "escl_manager_test.cc",
+      "ipp_util.cc",
+      "smart_buffer.cc",
+    ]
+    deps = [
+      "//common-mk/testrunner",
+    ]
   }
 
   executable("http-util-testrunner") {
