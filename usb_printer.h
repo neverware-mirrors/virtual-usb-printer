@@ -158,16 +158,17 @@ class UsbPrinter {
     return usb_descriptors_.endpoint_descriptors();
   }
 
+  // Determines whether |usb_request| is either a control or data request and
+  // defers to the corresponding function.
+  void HandleUsbRequest(int sockfd, const UsbipCmdSubmit& usb_request);
+
+ private:
   // Returns true if this printer supports ipp-over-usb. An ippusb printer must
   // have at least 2 interfaces with the following values:
   //    bInterfaceClass: 7
   //    bInterfaceSubClass: 1
   //    bInterfaceProtocol: 4
   bool IsIppUsb() const;
-
-  // Determines whether |usb_request| is either a control or data request and
-  // defers to the corresponding function.
-  void HandleUsbRequest(int sockd, const UsbipCmdSubmit& usb_request);
 
   // Determines whether |usb_request| is either a standard or class-specific
   // control request and defers to the corresponding function.
@@ -191,7 +192,6 @@ class UsbPrinter {
   // Get a pointer to the InterfaceManager that manages |endpoint|.
   InterfaceManager* GetInterfaceManager(int endpoint);
 
- private:
   HttpResponse GenerateHttpResponse(const HttpRequest& request,
                                     SmartBuffer* body);
 
