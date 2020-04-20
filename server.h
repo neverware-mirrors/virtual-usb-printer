@@ -12,54 +12,42 @@
 
 #include <base/files/scoped_file.h>
 
-// Attempts to create the socket used for accepting connections on the server,
-// and if successful returns the file descriptor of the socket.
-base::ScopedFD SetupServerSocket();
-
-// Binds the server socket described by |fd| to an address and returns the
-// resulting sockaddr_in struct which contains the address.
-struct sockaddr_in BindServerSocket(int fd);
-
-// Accepts a new connection to the server described by |fd| and returns the file
-// descriptor of the connection.
-base::ScopedFD AcceptConnection(int);
-
-// Converts the bound address in |server| and reports it in a human-readable
-// format.
-void ReportBoundAddress(struct sockaddr_in* server);
-
 void SendBuffer(int sockfd, const SmartBuffer& smart_buffer);
 SmartBuffer ReceiveBuffer(int sockfd, size_t size);
 
-// Handles an OpReqDevlist request using |printer| to create an OpRepDevlist
-// message.
-void HandleDeviceList(int sockfd, const UsbPrinter& printer);
+class Server {
+ public:
+  // Create a simple server which processes USBIP requests.
+  explicit Server(UsbPrinter printer);
 
-// Reads the requested bus ID for an OpReqImport message. Since we are only
-// exporting a single device we should only ever expect to receive the value for
-// the exported device, so this function is meant to simply clear the data from
-// the socket.
-void ReadBusId(int sockfd);
+  // Run the server to process USBIP requests.
+  // This function does not return.
+  void Run();
 
-// Handles an OpReqImport request using |printer| to create an OpRepImport
-// message.
-void HandleAttach(int sockfd, const UsbPrinter& printer);
+ private:
+  // Handles an OpReqDevlist request using |printer_| to create an OpRepDevlist
+  // message.
+  void HandleDeviceList(const base::ScopedFD& connection) const;
 
-// Handles either an OpReqDevlist or OpReqImport request received from
-// |connection|. Returns whether or not |connection| should remain open. If
-// |printer| is successfully attached from the OpReqImport request then set
-// |attached| to true.
-bool HandleOpRequest(const UsbPrinter& printer, int connection, bool* attached);
+  // Handles an OpReqImport request using |printer_| to create an OpRepImport
+  // message.
+  void HandleAttach(const base::ScopedFD& connection) const;
 
-// Handles a USB request received from |connection|. Returns whether or not
-// |connection| should remain open.
-bool HandleUsbRequest(const UsbPrinter& printer, int connection);
+  // Handles either an OpReqDevlist or OpReqImport request received from
+  // |connection|. Returns whether or not |connection| should remain open. If
+  // |printer_| is successfully attached from the OpReqImport request then set
+  // |attached| to true.
+  bool HandleOpRequest(const base::ScopedFD& connection, bool* attached) const;
 
-// Loops continuously while |connection| remains open and handles any requests
-// received on |connection|.
-void HandleConnection(const UsbPrinter& printer, base::ScopedFD connection);
+  // Handles a USB request received from |connection|. Returns whether or not
+  // |connection| should remain open.
+  bool HandleUsbRequest(const base::ScopedFD& connection);
 
-// Runs a simple server which processes USBIP requests.
-void RunServer(const UsbPrinter& printer);
+  // Loops continuously while |connection| remains open and handles any requests
+  // received on |connection|.
+  void HandleConnection(base::ScopedFD connection);
+
+  UsbPrinter printer_;
+};
 
 #endif  // __USBIP_SERVER_H__

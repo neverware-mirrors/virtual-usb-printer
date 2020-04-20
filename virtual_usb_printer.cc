@@ -129,5 +129,6 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  RunServer(printer);
+  Server server(std::move(printer));
+  server.Run();
 }

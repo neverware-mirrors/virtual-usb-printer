@@ -6,8 +6,6 @@
 
 #include "device_descriptors.h"
 #include "op_commands.h"
-#include "smart_buffer.h"
-#include "usb_printer.h"
 #include "usbip.h"
 #include "usbip_constants.h"
 
@@ -17,19 +15,22 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <utility>
 
 #include <arpa/inet.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
 
-#include <base/files/scoped_file.h>
 #include <base/logging.h>
 
-// Opens a socket with the option SO_REUSEADDR and returns the file descriptor
-// of the socket.
+namespace {
+
+// Attempts to create the socket used for accepting connections on the server,
+// and if successful returns the file descriptor of the socket.
+//
+// Opens a socket with the option SO_REUSEADDR;
 base::ScopedFD SetupServerSocket() {
   int fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
@@ -45,15 +46,16 @@ base::ScopedFD SetupServerSocket() {
   return base::ScopedFD(fd);
 }
 
-// Creates the sockaddr_in |server| and binds the socket |fd| to it.
-sockaddr_in BindServerSocket(int fd) {
+// Binds the server socket described by |fd| to an address and returns the
+// resulting sockaddr_in struct which contains the address.
+sockaddr_in BindServerSocket(const base::ScopedFD& sockfd) {
   sockaddr_in server;
   memset(&server, 0, sizeof(server));
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = htonl(INADDR_ANY);
   server.sin_port = htons(TCP_SERV_PORT);
 
-  if (bind(fd, (sockaddr*)&server, sizeof(server)) < 0) {
+  if (bind(sockfd.get(), (sockaddr*)&server, sizeof(server)) < 0) {
     LOG(ERROR) << "Bind error: " << strerror(errno);
     exit(1);
   }
@@ -61,12 +63,13 @@ sockaddr_in BindServerSocket(int fd) {
   return server;
 }
 
-// Attemps to accept connections on the network socket |fd|.
-base::ScopedFD AcceptConnection(int fd) {
+// Accepts a new connection to the server described by |fd| and returns the file
+// descriptor of the connection.
+base::ScopedFD AcceptConnection(const base::ScopedFD& fd) {
   sockaddr_in client;
   socklen_t client_length = sizeof(client);
   int connection =
-      accept(fd, reinterpret_cast<sockaddr*>(&client), &client_length);
+      accept(fd.get(), reinterpret_cast<sockaddr*>(&client), &client_length);
   if (connection < 0) {
     LOG(ERROR) << "Accept error: " << strerror(errno);
     exit(1);
@@ -76,6 +79,8 @@ base::ScopedFD AcceptConnection(int fd) {
   return base::ScopedFD(connection);
 }
 
+// Converts the bound address in |server| and reports it in a human-readable
+// format.
 void ReportBoundAddress(sockaddr_in* server) {
   char address[INET_ADDRSTRLEN];
   if (inet_ntop(AF_INET, &server->sin_addr, address, INET_ADDRSTRLEN)) {
@@ -86,6 +91,22 @@ void ReportBoundAddress(sockaddr_in* server) {
     exit(1);
   }
 }
+
+// Reads the requested bus ID for an OpReqImport message. Since we are only
+// exporting a single device we should only ever expect to receive the value for
+// the exported device, so this function is meant to simply clear the data from
+// the socket.
+void ReadBusId(const base::ScopedFD& sockfd) {
+  char busid[32];
+  LOG(INFO) << "Attaching device...";
+  ssize_t received = recv(sockfd.get(), busid, 32, 0);
+  if (received != 32) {
+    LOG(ERROR) << "Receive error: " << strerror(errno);
+    exit(1);
+  }
+}
+
+}  // namespace
 
 void SendBuffer(int sockfd, const SmartBuffer& smart_buffer) {
   size_t remaining = smart_buffer.size();
@@ -120,102 +141,11 @@ SmartBuffer ReceiveBuffer(int sockfd, size_t size) {
   return smart_buffer;
 }
 
-void HandleDeviceList(int sockfd, const UsbPrinter& printer) {
-  OpRepDevlist list;
-  LOG(INFO) << "Listing devices...";
-  CreateOpRepDevlist(printer.device_descriptor(),
-                     printer.configuration_descriptor(),
-                     printer.interface_descriptors(), &list);
-  SmartBuffer packed_devlist = PackOpRepDevlist(list);
-  free(list.interfaces);
-  SendBuffer(sockfd, packed_devlist);
-}
+Server::Server(UsbPrinter printer) : printer_(std::move(printer)) {}
 
-void ReadBusId(int sockfd) {
-  char busid[32];
-  LOG(INFO) << "Attaching device...";
-  ssize_t received = recv(sockfd, busid, 32, 0);
-  if (received != 32) {
-    LOG(ERROR) << "Receive error: " << strerror(errno);
-    exit(1);
-  }
-}
-
-void HandleAttach(int sockfd, const UsbPrinter& printer) {
-  OpRepImport rep;
-  CreateOpRepImport(printer.device_descriptor(),
-                    printer.configuration_descriptor(), &rep);
-  SmartBuffer packed_import = PackOpRepImport(rep);
-  SendBuffer(sockfd, packed_import);
-}
-
-bool HandleOpRequest(const UsbPrinter& printer, int connection,
-                     bool* attached) {
-  // Read in the header first in order to determine whether the request is an
-  // OpReqDevlist or an OpReqImport.
-  OpHeader request;
-  ssize_t received = recv(connection, &request, sizeof(request), 0);
-  if (received != sizeof(request)) {
-    LOG(ERROR) << "Receive error: " << strerror(errno);
-    exit(1);
-  }
-
-  UnpackOpHeader(&request);
-  if (request.command == OP_REQ_DEVLIST_CMD) {
-    HandleDeviceList(connection, printer);
-    return false;
-  } else if (request.command == OP_REQ_IMPORT_CMD) {
-    ReadBusId(connection);
-    HandleAttach(connection, printer);
-    *attached = true;
-    return true;
-  } else {
-    LOG(ERROR) << "Unknown command: " << request.command;
-    return false;
-  }
-}
-
-bool HandleUsbRequest(const UsbPrinter& printer, int connection) {
-  UsbipCmdSubmit command;
-  ssize_t received = recv(connection, &command, sizeof(command), 0);
-  if (received != sizeof(command)) {
-    if (received == 0) {
-      LOG(INFO) << "Client closed connection";
-      return false;
-    }
-    LOG(ERROR) << "Receive error: " << strerror(errno);
-    exit(1);
-  }
-
-  UnpackUsbip(reinterpret_cast<int*>(&command), sizeof(command));
-  if (command.header.command == COMMAND_USBIP_CMD_SUBMIT) {
-    printer.HandleUsbRequest(connection, command);
-    return true;
-  } else if (command.header.command == COMMAND_USBIP_CMD_UNLINK) {
-    LOG(INFO) << "Received unlink URB...ignoring";
-    LOG(INFO) << "Unlinked seqnum : " << command.transfer_flags;
-    return true;
-  } else {
-    LOG(ERROR) << "Unknown USBIP command " << command.header.command;
-    return false;
-  }
-}
-
-void HandleConnection(const UsbPrinter& printer, base::ScopedFD connection) {
-  bool connection_open = true;
-  bool attached = false;
-  while (connection_open) {
-    if (!attached) {
-      connection_open = HandleOpRequest(printer, connection.get(), &attached);
-    } else {
-      connection_open = HandleUsbRequest(printer, connection.get());
-    }
-  }
-}
-
-void RunServer(const UsbPrinter& printer) {
+void Server::Run() {
   base::ScopedFD fd = SetupServerSocket();
-  sockaddr_in server = BindServerSocket(fd.get());
+  sockaddr_in server = BindServerSocket(fd);
   ReportBoundAddress(&server);
 
   if (listen(fd.get(), SOMAXCONN) < 0) {
@@ -228,7 +158,90 @@ void RunServer(const UsbPrinter& printer) {
 
   while (true) {
     // Will block until a new connection has been accepted.
-    base::ScopedFD connection = AcceptConnection(fd.get());
-    HandleConnection(printer, std::move(connection));
+    base::ScopedFD connection = AcceptConnection(fd);
+    HandleConnection(std::move(connection));
+  }
+}
+
+void Server::HandleDeviceList(const base::ScopedFD& connection) const {
+  OpRepDevlist list;
+  LOG(INFO) << "Listing devices...";
+  CreateOpRepDevlist(printer_.device_descriptor(),
+                     printer_.configuration_descriptor(),
+                     printer_.interface_descriptors(), &list);
+  SmartBuffer packed_devlist = PackOpRepDevlist(list);
+  free(list.interfaces);
+  SendBuffer(connection.get(), packed_devlist);
+}
+
+void Server::HandleAttach(const base::ScopedFD& connection) const {
+  OpRepImport rep;
+  CreateOpRepImport(printer_.device_descriptor(),
+                    printer_.configuration_descriptor(), &rep);
+  SmartBuffer packed_import = PackOpRepImport(rep);
+  SendBuffer(connection.get(), packed_import);
+}
+
+bool Server::HandleOpRequest(const base::ScopedFD& connection,
+                             bool* attached) const {
+  // Read in the header first in order to determine whether the request is an
+  // OpReqDevlist or an OpReqImport.
+  OpHeader request;
+  ssize_t received = recv(connection.get(), &request, sizeof(request), 0);
+  if (received != sizeof(request)) {
+    LOG(ERROR) << "Receive error: " << strerror(errno);
+    exit(1);
+  }
+
+  UnpackOpHeader(&request);
+  if (request.command == OP_REQ_DEVLIST_CMD) {
+    HandleDeviceList(connection);
+    return false;
+  } else if (request.command == OP_REQ_IMPORT_CMD) {
+    ReadBusId(connection);
+    HandleAttach(connection);
+    *attached = true;
+    return true;
+  } else {
+    LOG(ERROR) << "Unknown command: " << request.command;
+    return false;
+  }
+}
+
+bool Server::HandleUsbRequest(const base::ScopedFD& connection) {
+  UsbipCmdSubmit command;
+  ssize_t received = recv(connection.get(), &command, sizeof(command), 0);
+  if (received != sizeof(command)) {
+    if (received == 0) {
+      LOG(INFO) << "Client closed connection";
+      return false;
+    }
+    LOG(ERROR) << "Receive error: " << strerror(errno);
+    exit(1);
+  }
+
+  UnpackUsbip(reinterpret_cast<int*>(&command), sizeof(command));
+  if (command.header.command == COMMAND_USBIP_CMD_SUBMIT) {
+    printer_.HandleUsbRequest(connection.get(), command);
+    return true;
+  } else if (command.header.command == COMMAND_USBIP_CMD_UNLINK) {
+    LOG(INFO) << "Received unlink URB...ignoring";
+    LOG(INFO) << "Unlinked seqnum : " << command.transfer_flags;
+    return true;
+  } else {
+    LOG(ERROR) << "Unknown USBIP command " << command.header.command;
+    return false;
+  }
+}
+
+void Server::HandleConnection(base::ScopedFD connection) {
+  bool connection_open = true;
+  bool attached = false;
+  while (connection_open) {
+    if (!attached) {
+      connection_open = HandleOpRequest(connection, &attached);
+    } else {
+      connection_open = HandleUsbRequest(connection);
+    }
   }
 }
