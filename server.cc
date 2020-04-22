@@ -133,6 +133,10 @@ SmartBuffer ReceiveBuffer(int sockfd, size_t size) {
   while (total < size) {
     size_t to_receive = std::min<size_t>(remaining, 512UL);
     ssize_t received = recv(sockfd, buf.get() + total, to_receive, 0);
+    if (received == 0 && size != 0) {
+      LOG(ERROR) << "Client has closed connection";
+      return smart_buffer;
+    }
     CHECK_GE(received, 0) << "Failed to receive data from socket";
     CHECK_GE(remaining, received) << "Received more data than expected";
     size_t received_unsigned = static_cast<size_t>(received);
@@ -211,18 +215,9 @@ bool Server::HandleOpRequest(const base::ScopedFD& connection,
 }
 
 bool Server::HandleUsbRequest(const base::ScopedFD& connection) {
-  UsbipCmdSubmit command;
-  ssize_t received = recv(connection.get(), &command, sizeof(command), 0);
-  if (received != sizeof(command)) {
-    if (received == 0) {
-      LOG(INFO) << "Client closed connection";
-      return false;
-    }
-    LOG(ERROR) << "Receive error: " << strerror(errno);
-    exit(1);
-  }
-
-  UnpackUsbip(reinterpret_cast<int*>(&command), sizeof(command));
+  SmartBuffer received =
+      ReceiveBuffer(connection.get(), sizeof(UsbipCmdSubmit));
+  UsbipCmdSubmit command = UnpackUsbipCmdSubmit(&received);
   if (command.header.command == COMMAND_USBIP_CMD_SUBMIT) {
     printer_.HandleUsbRequest(connection.get(), command);
     return true;

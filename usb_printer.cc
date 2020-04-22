@@ -518,11 +518,8 @@ void UsbPrinter::HandleBulkInRequest(int sockfd,
   response.header.direction = 1;
   response.actual_length = std::min(max_size, http_message.size());
   LOG(INFO) << "Sending " << response.actual_length << " byte response.";
-  size_t response_size = sizeof(response);
-  PackUsbip(reinterpret_cast<int*>(&response), response_size);
-  SmartBuffer response_buffer(response_size);
-  response_buffer.Add(&response, response_size);
 
+  SmartBuffer response_buffer = PackUsbipRetSubmit(response);
   if (http_message.size() > max_size) {
     size_t leftover_size = http_message.size() - max_size;
     SmartBuffer leftover(leftover_size);

@@ -5,7 +5,6 @@
 #include "usbip.h"
 
 #include <cinttypes>
-#include <utility>
 
 #include "device_descriptors.h"
 #include "server.h"
@@ -13,24 +12,45 @@
 #include "usb_printer.h"
 #include "usbip_constants.h"
 
-void PackUsbip(int* data, size_t msg_size) {
-  int size = msg_size / 4;
-  for (int i = 0; i < size; i++) {
-    data[i] = htonl(data[i]);
-  }
-  // Put |setup| into network byte order. Since |setup| is a 64-bit integer we
-  // have to swap the final 2 int entries since they are both a part of |setup|.
-  std::swap(data[size - 1], data[size - 2]);
+#include <base/logging.h>
+
+SmartBuffer PackUsbipRetSubmit(const UsbipRetSubmit& reply) {
+  SmartBuffer serialized;
+  serialized.Add(htonl(reply.header.command));
+  serialized.Add(htonl(reply.header.seqnum));
+  serialized.Add(htonl(reply.header.devid));
+  serialized.Add(htonl(reply.header.direction));
+  serialized.Add(htonl(reply.header.ep));
+
+  serialized.Add(htonl(reply.status));
+  serialized.Add(htonl(reply.actual_length));
+  serialized.Add(htonl(reply.start_frame));
+  serialized.Add(htonl(reply.number_of_packets));
+  serialized.Add(htonl(reply.error_count));
+
+  serialized.Add(htobe64(reply.setup));
+  return serialized;
 }
 
-void UnpackUsbip(int* data, size_t msg_size) {
-  int size = msg_size / 4;
-  for (int i = 0; i < size; i++) {
-    data[i] = ntohl(data[i]);
-  }
-  // Put |setup| into host byte order. Since |setup| is a 64-bit integer we
-  // have to swap the final 2 int entries since they are both a part of |setup|.
-  std::swap(data[size - 1], data[size - 2]);
+UsbipCmdSubmit UnpackUsbipCmdSubmit(SmartBuffer* buf) {
+  UsbipCmdSubmit result;
+  CHECK(buf->size() >= sizeof(result));
+  memcpy(&result, buf->data(), sizeof(result));
+  buf->Erase(0, sizeof(result));
+
+  result.header.command = ntohl(result.header.command);
+  result.header.seqnum = ntohl(result.header.seqnum);
+  result.header.devid = ntohl(result.header.devid);
+  result.header.direction = ntohl(result.header.direction);
+  result.header.ep = ntohl(result.header.ep);
+
+  result.transfer_flags = ntohl(result.transfer_flags);
+  result.transfer_buffer_length = ntohl(result.transfer_buffer_length);
+  result.start_frame = ntohl(result.start_frame);
+  result.number_of_packets = ntohl(result.number_of_packets);
+  result.interval = ntohl(result.interval);
+  result.setup = be64toh(result.setup);
+  return result;
 }
 
 void PrintUsbipHeaderBasic(const UsbipHeaderBasic& header) {
@@ -84,12 +104,7 @@ void SendUsbDataResponse(int sockfd, const UsbipCmdSubmit& usb_request,
   response.actual_length = received;
 
   PrintUsbipRetSubmit(response);
-  size_t response_size = sizeof(response);
-  PackUsbip(reinterpret_cast<int*>(&response), response_size);
-
-  SmartBuffer smart_buffer(response_size);
-  smart_buffer.Add(&response, response_size);
-  SendBuffer(sockfd, smart_buffer);
+  SendBuffer(sockfd, PackUsbipRetSubmit(response));
 }
 
 void SendUsbControlResponse(int sockfd, const UsbipCmdSubmit& usb_request,
@@ -98,11 +113,7 @@ void SendUsbControlResponse(int sockfd, const UsbipCmdSubmit& usb_request,
   response.actual_length = data_size;
 
   PrintUsbipRetSubmit(response);
-  size_t response_size = sizeof(response);
-  PackUsbip(reinterpret_cast<int*>(&response), response_size);
-
-  SmartBuffer smart_buffer(response_size);
-  smart_buffer.Add(&response, response_size);
+  SmartBuffer smart_buffer = PackUsbipRetSubmit(response);
   if (data_size > 0) {
     smart_buffer.Add(data, data_size);
   }

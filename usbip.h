@@ -79,11 +79,15 @@ void PrintUsbControlRequest(const UsbControlRequest& request);
 // from |request|.
 UsbipRetSubmit CreateUsbipRetSubmit(const UsbipCmdSubmit& usb_request);
 
-// Converts the contents of a UsbipCmdSubmit message into network byte order.
-void PackUsbip(int* data, size_t msg_size);
+// Serializes |reply| into a buffer and converts the contents to network byte
+// order.
+SmartBuffer PackUsbipRetSubmit(const UsbipRetSubmit& reply);
 
-// Converts the contents a UsbipCmdSubmit message into host uint8_t order.
-void UnpackUsbip(int* data, size_t msg_size);
+// Reads a UsbipCmdSubmit struct from |buf| and converts the contents of the
+// message into host byte order.
+//
+// Erases the deserialized bytes from |buf|.
+UsbipCmdSubmit UnpackUsbipCmdSubmit(SmartBuffer* buf);
 
 // Responds to the USB data request |usb_request| by sending a UsbRetSubmit
 // message that uses |received| to indicate how many uint8_ts that it
