@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __VALUD_UTIL_H__
-#define __VALUD_UTIL_H__
+#ifndef VALUE_UTIL_H__
+#define VALUE_UTIL_H__
 
 #include <memory>
 #include <string>
@@ -27,4 +27,4 @@ std::unique_ptr<base::Value> GetJSONValue(const std::string& json_contents);
 // are migrated to base::Value
 const base::DictionaryValue* GetDictionary(const base::Value* value);
 
-#endif  // __VALUD_UTIL_H__
+#endif  // VALUE_UTIL_H__

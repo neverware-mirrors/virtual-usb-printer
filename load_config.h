@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __LOAD_CONFIG_H__
-#define __LOAD_CONFIG_H__
+#ifndef LOAD_CONFIG_H__
+#define LOAD_CONFIG_H__
 
 #include <map>
 #include <vector>
@@ -93,4 +93,4 @@ std::vector<std::vector<char>> GetStringDescriptors(
 // TODO(crbug.com/1099111): change base::DictionaryValue to base::Value
 std::vector<char> GetIEEEDeviceId(const base::DictionaryValue* printer);
 
-#endif  // __LOAD_CONFIG_H__
+#endif  // LOAD_CONFIG_H__

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __IPP_UTIL_H__
-#define __IPP_UTIL_H__
+#ifndef IPP_UTIL_H__
+#define IPP_UTIL_H__
 
 #include <cstring>
 #include <string>
@@ -153,4 +153,4 @@ void AddDate(const IppAttribute& attribute, SmartBuffer* buf);
 void AddRange(const IppAttribute& attribute, SmartBuffer* buf);
 void AddResolution(const IppAttribute& attribute, SmartBuffer* buf);
 
-#endif  // __IPP_UTIL_H__
+#endif  // IPP_UTIL_H__

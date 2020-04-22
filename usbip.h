@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __USBIP_USBIP_H__
-#define __USBIP_USBIP_H__
+#ifndef USBIP_H__
+#define USBIP_H__
 
 /*
  * This file defines the supported messages from the usbip-core protocol,
@@ -97,4 +97,4 @@ void SendUsbDataResponse(int sockfd, const UsbipCmdSubmit& usb_request,
 void SendUsbControlResponse(int sockfd, const UsbipCmdSubmit& usb_request,
                             const uint8_t* data, size_t size);
 
-#endif  // __USBIP_USBIP_H__
+#endif  // USBIP_H__

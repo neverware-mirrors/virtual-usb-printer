@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __DEVICE_DESCRIPTORS_H__
-#define __DEVICE_DESCRIPTORS_H__
+#ifndef DEVICE_DESCRIPTORS_H__
+#define DEVICE_DESCRIPTORS_H__
 
 #include <cstdint>
 
@@ -178,4 +178,4 @@ void PrintConfigurationDescriptor(const UsbConfigurationDescriptor& conf);
 void PrintInterfaceDescriptor(const UsbInterfaceDescriptor& intf);
 void PrintEndpointDescriptor(const UsbEndpointDescriptor& endp);
 
-#endif  // __DEVICE_DESCRIPTORS_H__
+#endif  // DEVICE_DESCRIPTORS_H__

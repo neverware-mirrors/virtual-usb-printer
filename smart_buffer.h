@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __SMART_BUFFER_H__
-#define __SMART_BUFFER_H__
+#ifndef SMART_BUFFER_H__
+#define SMART_BUFFER_H__
 
 #include <memory>
 #include <string>
@@ -96,4 +96,4 @@ void SmartBuffer::Add(const std::vector<T>& v) {
   Add(v.data(), byte_size);
 }
 
-#endif  // __SMART_BUFFER_H__
+#endif  // SMART_BUFFER_H__

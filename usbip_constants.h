@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __USBIP_CONSTANTS_H__
-#define __USBIP_CONSTANTS_H__
+#ifndef USBIP_CONSTANTS_H__
+#define USBIP_CONSTANTS_H__
 
 // USB Decriptor Type Constants.
 #define USB_DESCRIPTOR_DEVICE 0x01            // Device Descriptor.
@@ -60,4 +60,4 @@
 // Port that the server is bound to.
 #define TCP_SERV_PORT 3240
 
-#endif  // __USBIP_CONSTANTS_H__
+#endif  // USBIP_CONSTANTS_H__

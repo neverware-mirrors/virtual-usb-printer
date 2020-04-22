@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __OP_COMMANDS_H__
-#define __OP_COMMANDS_H__
+#ifndef OP_COMMANDS_H__
+#define OP_COMMANDS_H__
 
 /*
  * This file defines the supported OP command messages from the usbip userspace
@@ -138,4 +138,4 @@ SmartBuffer PackOpRepImport(OpRepImport import);
 // Convert |header| into host uint8_t order.
 void UnpackOpHeader(OpHeader* header);
 
-#endif  // __OP_COMMANDS_H__
+#endif  // OP_COMMANDS_H__

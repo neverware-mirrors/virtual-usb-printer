@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __USBIP_SERVER_H__
-#define __USBIP_SERVER_H__
+#ifndef SERVER_H__
+#define SERVER_H__
 
 #include <netinet/in.h>
 
@@ -50,4 +50,4 @@ class Server {
   UsbPrinter printer_;
 };
 
-#endif  // __USBIP_SERVER_H__
+#endif  // SERVER_H__

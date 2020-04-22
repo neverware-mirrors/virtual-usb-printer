@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __IPP_MANAGER_H__
-#define __IPP_MANAGER_H__
+#ifndef IPP_MANAGER_H__
+#define IPP_MANAGER_H__
 
 #include <vector>
 
@@ -53,4 +53,4 @@ class IppManager {
   base::FilePath document_output_path_;
 };
 
-#endif  // __IPP_MANAGER_H__
+#endif  // IPP_MANAGER_H__
