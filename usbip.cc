@@ -5,6 +5,7 @@
 #include "usbip.h"
 
 #include <cinttypes>
+#include <utility>
 
 #include "device_descriptors.h"
 #include "server.h"
@@ -14,16 +15,6 @@
 
 #include <base/logging.h>
 
-namespace {
-
-void swap(int* a, int* b) {
-  int tmp = *a;
-  *a = *b;
-  *b = tmp;
-}
-
-}  // namespace
-
 void PackUsbip(int* data, size_t msg_size) {
   int size = msg_size / 4;
   for (int i = 0; i < size; i++) {
@@ -31,7 +22,7 @@ void PackUsbip(int* data, size_t msg_size) {
   }
   // Put |setup| into network byte order. Since |setup| is a 64-bit integer we
   // have to swap the final 2 int entries since they are both a part of |setup|.
-  swap(&data[size - 1], &data[size - 2]);
+  std::swap(data[size - 1], data[size - 2]);
 }
 
 void UnpackUsbip(int* data, size_t msg_size) {
@@ -41,7 +32,7 @@ void UnpackUsbip(int* data, size_t msg_size) {
   }
   // Put |setup| into host byte order. Since |setup| is a 64-bit integer we
   // have to swap the final 2 int entries since they are both a part of |setup|.
-  swap(&data[size - 1], &data[size - 2]);
+  std::swap(data[size - 1], data[size - 2]);
 }
 
 void PrintUsbipHeaderBasic(const UsbipHeaderBasic& header) {
@@ -96,7 +87,7 @@ void SendUsbDataResponse(int sockfd, const UsbipCmdSubmit& usb_request,
 
   PrintUsbipRetSubmit(response);
   size_t response_size = sizeof(response);
-  PackUsbip((int*)&response, response_size);
+  PackUsbip(reinterpret_cast<int*>(&response), response_size);
 
   SmartBuffer smart_buffer(response_size);
   smart_buffer.Add(&response, response_size);
@@ -110,7 +101,7 @@ void SendUsbControlResponse(int sockfd, const UsbipCmdSubmit& usb_request,
 
   PrintUsbipRetSubmit(response);
   size_t response_size = sizeof(response);
-  PackUsbip((int*)&response, response_size);
+  PackUsbip(reinterpret_cast<int*>(&response), response_size);
 
   SmartBuffer smart_buffer(response_size);
   smart_buffer.Add(&response, response_size);

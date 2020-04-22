@@ -7,6 +7,7 @@
 
 #include <map>
 #include <vector>
+#include <string>
 
 #include "device_descriptors.h"
 #include "usbip_constants.h"

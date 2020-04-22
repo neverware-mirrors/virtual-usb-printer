@@ -5,6 +5,7 @@
 #include "usb_printer.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -50,7 +51,7 @@ int GetControlType(uint8_t bmRequestType) {
 
 // Unpacks the standard USB SETUP packet contained within |setup| into a
 // UsbControlRequest struct and returns the result.
-UsbControlRequest CreateUsbControlRequest(long long setup) {
+UsbControlRequest CreateUsbControlRequest(int64_t setup) {
   UsbControlRequest request;
   request.bmRequestType = (setup & REQUEST_TYPE_MASK) >> 56;
   request.bRequest = (setup & REQUEST_MASK) >> 48;

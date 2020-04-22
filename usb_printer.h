@@ -15,6 +15,7 @@
 #include <map>
 #include <queue>
 #include <vector>
+#include <string>
 
 #include <base/files/file.h>
 
@@ -36,7 +37,7 @@ class InterfaceManager {
   // is called when |queue_| is empty then the program will exit.
   SmartBuffer PopMessage();
 
-  bool receiving_chunked() const { return receiving_chunked_; };
+  bool receiving_chunked() const { return receiving_chunked_; }
   void set_receiving_chunked(bool b) { receiving_chunked_ = b; }
 
   const IppHeader& chunked_ipp_header() const { return chunked_ipp_header_; }

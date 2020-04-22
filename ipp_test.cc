@@ -19,7 +19,7 @@
 
 namespace {
 
-using namespace std::string_literals;
+using std::string_literals::operator""s;
 
 const std::vector<uint8_t> CreateByteVector(const std::string& str) {
   std::vector<uint8_t> v(str.size());

@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <map>
+#include <memory>
 
 #include <base/values.h>
 #include <gmock/gmock.h>

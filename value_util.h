@@ -9,6 +9,9 @@
 #include <base/optional.h>
 #include <base/values.h>
 
+#include <memory>
+#include <string>
+
 // Attempt to load the contents of the JSON file located at |file_path| and
 // return the contents in a string.
 base::Optional<std::string> GetJSONContents(const std::string& file_path);

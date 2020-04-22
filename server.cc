@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <utility>
 
 #include <arpa/inet.h>
@@ -55,7 +56,8 @@ sockaddr_in BindServerSocket(const base::ScopedFD& sockfd) {
   server.sin_addr.s_addr = htonl(INADDR_ANY);
   server.sin_port = htons(TCP_SERV_PORT);
 
-  if (bind(sockfd.get(), (sockaddr*)&server, sizeof(server)) < 0) {
+  sockaddr* server_socket = reinterpret_cast<sockaddr*>(&server);
+  if (bind(sockfd.get(), server_socket, sizeof(server_socket)) < 0) {
     LOG(ERROR) << "Bind error: " << strerror(errno);
     exit(1);
   }
