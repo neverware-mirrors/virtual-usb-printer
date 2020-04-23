@@ -10,6 +10,11 @@
 #include <base/values.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <libxml/parser.h>
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
+
+#include "xml_util.h"
 
 using base::Value;
 using ::testing::ElementsAre;
@@ -40,6 +45,10 @@ Value CreateCapabilitiesJson() {
   dict.SetKey("Platen", std::move(platen));
 
   return dict;
+}
+
+inline const xmlChar* XmlCast(const char* p) {
+  return reinterpret_cast<const xmlChar*>(p);
 }
 
 }  // namespace
@@ -110,4 +119,63 @@ TEST(ScannerCapabilities, InitializeFailMissingPlatenSection) {
   Value json = CreateCapabilitiesJson();
   EXPECT_TRUE(json.RemoveKey("Platen"));
   EXPECT_FALSE(CreateScannerCapabilitiesFromConfig(std::move(json)));
+}
+
+// Despite taking a mutable pointer to |doc|, this does not modify |doc|.
+void HasPathWithContents(xmlDoc* doc,
+                         const std::string& path,
+                         std::vector<std::string> expected_contents) {
+  xmlXPathContext* context = xmlXPathNewContext(doc);
+  xmlXPathRegisterNs(context, XmlCast("scan"),
+                     XmlCast("http://schemas.hp.com/imaging/escl/2011/05/03"));
+  xmlXPathRegisterNs(context, XmlCast("pwg"),
+                     XmlCast("http://www.pwg.org/schemas/2010/12/sm"));
+  xmlXPathObject* result =
+      xmlXPathEvalExpression(XmlCast(path.c_str()), context);
+  ASSERT_FALSE(xmlXPathNodeSetIsEmpty(result->nodesetval))
+      << "No nodes found with path " << path;
+  int node_count = result->nodesetval->nodeNr;
+  ASSERT_EQ(node_count, expected_contents.size())
+      << "Found " << node_count << " nodes, but " << expected_contents.size()
+      << " were expected.";
+  for (int i = 0; i < node_count; i++) {
+    const xmlNode* node = result->nodesetval->nodeTab[i];
+    xmlChar* node_text = xmlNodeGetContent(node);
+    EXPECT_EQ(reinterpret_cast<char*>(node_text), expected_contents[i]);
+    xmlFree(node_text);
+  }
+  xmlXPathFreeContext(context);
+  xmlXPathFreeObject(result);
+}
+
+TEST(ScannerCapabilities, AsXml) {
+  base::Optional<ScannerCapabilities> caps =
+      CreateScannerCapabilitiesFromConfig(CreateCapabilitiesJson());
+  ASSERT_TRUE(caps);
+  std::vector<uint8_t> xml = ScannerCapabilitiesAsXml(caps.value());
+  xmlDoc* doc = xmlReadMemory(reinterpret_cast<const char*>(xml.data()),
+                              xml.size(), "noname.xml", NULL, 0);
+  EXPECT_NE(doc, nullptr);
+
+  HasPathWithContents(doc, "/scan:ScannerCapabilities/pwg:Version", {"2.63"});
+  HasPathWithContents(doc, "/scan:ScannerCapabilities/pwg:MakeAndModel",
+                      {"Test Make and Model"});
+  HasPathWithContents(doc, "/scan:ScannerCapabilities/pwg:SerialNumber",
+                      {"Test Serial"});
+
+  const std::string platen_caps =
+      "/scan:ScannerCapabilities/scan:Platen/scan:PlatenInputCaps";
+  const std::string profiles = "/scan:SettingProfiles/scan:SettingProfile";
+  HasPathWithContents(
+      doc, platen_caps + profiles + "/scan:ColorModes/scan:ColorMode",
+      {"RGB24", "Grayscale8"});
+  HasPathWithContents(
+      doc, platen_caps + profiles + "/scan:DocumentFormats/pwg:DocumentFormat",
+      {"application/pdf"});
+  HasPathWithContents(doc,
+                      platen_caps + profiles +
+                          "/scan:SupportedResolutions/scan:DiscreteResolutions/"
+                          "scan:DiscreteResolution/scan:XResolution",
+                      {"100", "200", "300"});
+  xmlFreeDoc(doc);
 }

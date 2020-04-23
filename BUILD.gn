@@ -5,9 +5,7 @@
 import("//common-mk/pkg_config.gni")
 
 group("all") {
-  deps = [
-    ":virtual-usb-printer",
-  ]
+  deps = [ ":virtual-usb-printer" ]
   if (use.test) {
     deps += [
       ":escl-manager-testrunner",
@@ -23,6 +21,7 @@ pkg_config("target_defaults") {
   pkg_deps = [
     "libbrillo",
     "libchrome-${libbase_ver}",
+    "libxml-2.0",
   ]
 }
 
@@ -43,6 +42,7 @@ executable("virtual-usb-printer") {
     "usbip.cc",
     "value_util.cc",
     "virtual_usb_printer.cc",
+    "xml_util.cc",
   ]
 }
 
@@ -62,10 +62,9 @@ if (use.test) {
       "escl_manager_test.cc",
       "ipp_util.cc",
       "smart_buffer.cc",
+      "xml_util.cc",
     ]
-    deps = [
-      "//common-mk/testrunner",
-    ]
+    deps = [ "//common-mk/testrunner" ]
   }
 
   executable("http-util-testrunner") {
@@ -81,9 +80,7 @@ if (use.test) {
       "smart_buffer.cc",
       "value_util.cc",
     ]
-    deps = [
-      "//common-mk/testrunner",
-    ]
+    deps = [ "//common-mk/testrunner" ]
   }
 
   executable("ipp-util-testrunner") {
@@ -101,9 +98,7 @@ if (use.test) {
       "smart_buffer.cc",
       "value_util.cc",
     ]
-    deps = [
-      "//common-mk/testrunner",
-    ]
+    deps = [ "//common-mk/testrunner" ]
   }
 
   executable("smart-buffer-testrunner") {
@@ -117,9 +112,7 @@ if (use.test) {
       "smart_buffer_test.cc",
       "value_util.cc",
     ]
-    deps = [
-      "//common-mk/testrunner",
-    ]
+    deps = [ "//common-mk/testrunner" ]
   }
 
   executable("load-config-testrunner") {
@@ -134,8 +127,6 @@ if (use.test) {
       "load_config_test.cc",
       "value_util.cc",
     ]
-    deps = [
-      "//common-mk/testrunner",
-    ]
+    deps = [ "//common-mk/testrunner" ]
   }
 }
