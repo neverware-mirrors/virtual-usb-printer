@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-#include <base/optional.h>
 #include <base/values.h>
 
 #include "cups_constants.h"
@@ -91,18 +90,7 @@ class IppAttribute {
   const base::Value* value_;
 };
 
-class IppHeader {
- public:
-  // Attempts to parse an IppHeader from the beginning of |message|.
-  // If successful, remove the header from |message|, so that it contains only
-  // the body of the ipp request.
-  static base::Optional<IppHeader> Deserialize(SmartBuffer* message);
-
-  // Append this IppHeader to |buf|.
-  void Serialize(SmartBuffer* buf);
-
-  // Do not re-order or add to these fields. They are laid out such that they
-  // match the serialized format of an IppHeader (apart from byte ordering).
+struct IppHeader {
   uint8_t major;
   uint8_t minor;
   // NOTE: operation_id is treated as a status value in an IPP response.
@@ -110,12 +98,17 @@ class IppHeader {
   int request_id;
 };
 
+void PackIppHeader(IppHeader* header);
+void UnpackIppHeader(IppHeader* header);
+
 bool IsHttpChunkedMessage(const SmartBuffer& message);
 
 bool ContainsHttpHeader(const SmartBuffer& message);
 
 // Determines if |message| contains the body of an HTTP message.
 bool ContainsHttpBody(const SmartBuffer& message);
+
+IppHeader GetIppHeader(const SmartBuffer& message);
 
 size_t ExtractChunkSize(const SmartBuffer& message);
 
@@ -156,6 +149,8 @@ std::vector<IppAttribute> GetAttributes(const base::Value* attributes,
 
 // Converts the |name| of a tag into its corresponding value from cups.
 IppTag GetIppTag(const std::string& group);
+
+void AddIppHeader(const IppHeader& header, SmartBuffer* buf);
 
 void AddEndOfAttributes(SmartBuffer* buf);
 

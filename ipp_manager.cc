@@ -46,7 +46,7 @@ SmartBuffer IppManager::HandleValidateJob(
   size_t response_size =
       sizeof(response_header) + GetAttributesSize(operation_attributes_) + 1;
   SmartBuffer buf(response_size);
-  response_header.Serialize(&buf);
+  AddIppHeader(response_header, &buf);
   AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
   AddEndOfAttributes(&buf);
   return buf;
@@ -62,7 +62,7 @@ SmartBuffer IppManager::HandleCreateJob(const IppHeader& request_header) const {
                          GetAttributesSize(operation_attributes_) +
                          GetAttributesSize(job_attributes_) + 1;
   SmartBuffer buf(response_size);
-  response_header.Serialize(&buf);
+  AddIppHeader(response_header, &buf);
   AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
   AddPrinterAttributes(job_attributes_, kJobAttributes, &buf);
   AddEndOfAttributes(&buf);
@@ -80,7 +80,7 @@ SmartBuffer IppManager::HandleSendDocument(
                          GetAttributesSize(operation_attributes_) +
                          GetAttributesSize(job_attributes_) + 1;
   SmartBuffer buf(response_size);
-  response_header.Serialize(&buf);
+  AddIppHeader(response_header, &buf);
   AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
   AddPrinterAttributes(job_attributes_, kJobAttributes, &buf);
   AddEndOfAttributes(&buf);
@@ -97,7 +97,7 @@ SmartBuffer IppManager::HandleGetJobAttributes(
                          GetAttributesSize(operation_attributes_) +
                          GetAttributesSize(job_attributes_) + 1;
   SmartBuffer buf(response_size);
-  response_header.Serialize(&buf);
+  AddIppHeader(response_header, &buf);
   AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
   AddPrinterAttributes(job_attributes_, kJobAttributes, &buf);
   AddEndOfAttributes(&buf);
@@ -115,7 +115,7 @@ SmartBuffer IppManager::HandleGetPrinterAttributes(
                          GetAttributesSize(operation_attributes_) +
                          GetAttributesSize(printer_attributes_) + 1;
   SmartBuffer buf(response_size);
-  response_header.Serialize(&buf);
+  AddIppHeader(response_header, &buf);
   AddPrinterAttributes(operation_attributes_, kOperationAttributes, &buf);
   AddPrinterAttributes(printer_attributes_, kPrinterAttributes, &buf);
   AddEndOfAttributes(&buf);
