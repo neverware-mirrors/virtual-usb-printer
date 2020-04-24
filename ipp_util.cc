@@ -9,6 +9,7 @@
 #include <string>
 
 #include <arpa/inet.h>
+#include <base/optional.h>
 #include <base/values.h>
 
 #include "smart_buffer.h"
@@ -110,6 +111,111 @@ void AddStringAttribute(const std::string& value, IppTag tag,
   AddName(name, include_name, buf);
   AddValueLength(value.size(), buf);
   buf->Add(value.c_str(), value.size());
+}
+
+base::Optional<uint16_t> ReadShort(const std::vector<uint8_t>& bytes,
+                                   size_t start) {
+  uint16_t value;
+  if (start + sizeof(value) > bytes.size()) {
+    LOG(ERROR) << "Could not read short value, there are not 2 bytes available";
+    return base::nullopt;
+  }
+
+  memcpy(&value, &bytes[start], sizeof(value));
+  value = ntohs(value);
+  return value;
+}
+
+// Get the length of an IPP attribute in |bytes| starting at index |start|.
+// If |bytes| does not contain a well-formed attribute, return nullopt.
+base::Optional<size_t> GetAttributeLength(const std::vector<uint8_t>& bytes,
+                                          size_t start) {
+  size_t i = start;
+  base::Optional<uint16_t> name_length = ReadShort(bytes, i);
+  if (!name_length) {
+    LOG(ERROR) << "Failed reading name length at index " << i;
+    return base::nullopt;
+  }
+  i += 2;
+  i += name_length.value();
+  base::Optional<uint16_t> value_length = ReadShort(bytes, i);
+  if (!value_length) {
+    LOG(ERROR) << "Failed reading value length at index " << i;
+    return base::nullopt;
+  }
+  i += 2;
+  i += value_length.value();
+  if (i > bytes.size()) {
+    LOG(ERROR) << "Value length " << value_length.value()
+               << " exceeds size of buffer";
+    return base::nullopt;
+  }
+  return i - start;
+}
+
+// Valid tag range defined in RFC 8010:
+// https://tools.ietf.org/html/rfc8010#section-3.2
+// See 'begin-attribute-group-tag'
+bool IsAttributeGroupTag(uint8_t tag) {
+  return (0x00 <= tag && tag < 0x02) || (0x04 <= tag && tag <= 0x0F);
+}
+
+// Get the length of an IPP attribute group in |bytes| starting at index
+// |start|. Do this by summing the lengths of each attribute within the group.
+// If |bytes| does not contain a well-formed attribute group, return nullopt.
+base::Optional<size_t> GetGroupLength(const std::vector<uint8_t>& bytes,
+                                      size_t start) {
+  if (start >= bytes.size())
+    return base::nullopt;
+
+  size_t i = start;
+  while (i < bytes.size()) {
+    uint8_t tag = bytes[i];
+    if (tag == static_cast<uint8_t>(IppTag::END) || IsAttributeGroupTag(tag)) {
+      // Reached end of group.
+      return i - start;
+    }
+    // Skip the tag.
+    i++;
+
+    // Skip the attribute.
+    base::Optional<size_t> length = GetAttributeLength(bytes, i);
+    if (!length) {
+      LOG(ERROR) << "Failed to parse attribute at index " << i;
+      return base::nullopt;
+    }
+    i += length.value();
+  }
+  LOG(ERROR) << "Reached end of group without finding END or new group tag";
+  return base::nullopt;
+}
+
+// Get the length of the IPP attributes section at the beginning of |bytes|.
+// Do this by summing the lengths of each attribute group.
+// If |bytes| does not contain a well-formed attributes section, return nullopt.
+base::Optional<size_t> GetAttributesLength(const std::vector<uint8_t>& bytes) {
+  size_t i = 0;
+  while (i < bytes.size()) {
+    uint8_t tag = bytes[i++];
+    if (tag == static_cast<uint8_t>(IppTag::END)) {
+      return i;
+    } else if (IsAttributeGroupTag(tag)) {
+      // This is the start of a group
+      base::Optional<size_t> length = GetGroupLength(bytes, i);
+      if (!length) {
+        LOG(ERROR) << "Failed to parse group at index " << i;
+        return base::nullopt;
+      }
+      i += length.value();
+    } else {
+      LOG(ERROR) << "Invalid attribute group tag '" << static_cast<int>(tag)
+                 << "'";
+      return base::nullopt;
+    }
+  }
+  // Attributes must end with an END tag, so if we reach here it is invalid.
+  LOG(ERROR) << "Reached end of buffer without finding END tag";
+  return base::nullopt;
 }
 
 }  // namespace
@@ -277,6 +383,17 @@ IppHeader GetIppHeader(const SmartBuffer& message) {
   memcpy(&header, message.data() + offset, sizeof(header));
   UnpackIppHeader(&header);
   return header;
+}
+
+bool RemoveIppAttributes(SmartBuffer* buf) {
+  base::Optional<size_t> length = GetAttributesLength(buf->contents());
+  if (!length) {
+    LOG(ERROR) << "Buffer does not contain well-formed IPP attributes";
+    return false;
+  }
+
+  buf->Erase(0, length.value());
+  return true;
 }
 
 size_t ExtractChunkSize(const SmartBuffer& message) {

@@ -110,6 +110,13 @@ bool ContainsHttpBody(const SmartBuffer& message);
 
 IppHeader GetIppHeader(const SmartBuffer& message);
 
+// Strip leading IPP attributes from |buf|.
+// Returns true and strips leading attributes if |buf| starts with well-formed
+// IPP attributes.
+// Returns false and does not modify |buf| if |buf| does not contain any
+// attributes.
+bool RemoveIppAttributes(SmartBuffer* buf);
+
 size_t ExtractChunkSize(const SmartBuffer& message);
 
 SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message);

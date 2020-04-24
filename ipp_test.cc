@@ -172,6 +172,131 @@ TEST(GetIppHeader, NoHttpHeader) {
   EXPECT_EQ(ipp_header.request_id, 7);
 }
 
+TEST(RemoveAttributes, HasEndTag) {
+  std::string message =
+      // IPP attributes.
+      "\x01\x47\x00\x12"
+      "attributes-charset"
+      "\x00\x05"
+      "utf-8"
+      "\x48\x00\x1b"
+      "attributes-natural-language"
+      "\x00\x05"
+      "en-us"
+      "\x45\x00\x0b"
+      "printer-uri"
+      "\x00\x19"
+      "ipp://04a9_27e8/ipp/print\x03"
+      // Body
+      "test image data"s;
+
+  SmartBuffer buf;
+  buf.Add(message);
+  EXPECT_TRUE(RemoveIppAttributes(&buf));
+
+  std::string body = "test image data";
+  std::vector<uint8_t> expected(body.begin(), body.end());
+  EXPECT_EQ(buf.contents(), expected);
+}
+
+TEST(RemoveAttributes, EndCharacterWithinAttributes) {
+  std::string message =
+      // IPP attributes.
+      "\x01\x47\x00\x12"
+      "attributes-charset"
+      "\x00\x03"
+      "utf\x03"s;
+
+  SmartBuffer buf;
+  buf.Add(message);
+  EXPECT_TRUE(RemoveIppAttributes(&buf));
+  EXPECT_EQ(buf.size(), 0);
+}
+
+TEST(RemoveAttributes, EmptyBody) {
+  std::string message =
+      // IPP attributes.
+      "\x01\x47\x00\x12"
+      "attributes-charset"
+      "\x00\x05"
+      "utf-8\x03"s;
+
+  SmartBuffer buf;
+  buf.Add(message);
+  EXPECT_TRUE(RemoveIppAttributes(&buf));
+  EXPECT_EQ(buf.size(), 0);
+}
+
+TEST(RemoveAttributes, MultipleEndTags) {
+  std::string message =
+      // IPP attributes.
+      "\x01\x47\x00\x12"
+      "attributes-charset"
+      "\x00\x05"
+      "utf-8\x03"
+      "test mess\x03age"s;
+
+  SmartBuffer buf;
+  buf.Add(message);
+  EXPECT_TRUE(RemoveIppAttributes(&buf));
+
+  std::string body = "test mess\x03age";
+  std::vector<uint8_t> expected(body.begin(), body.end());
+  EXPECT_EQ(buf.contents(), expected);
+}
+
+TEST(RemoveAttributes, MultipleGroups) {
+  std::string message =
+      // IPP attributes.
+      "\x01\x47\x00\x12"
+      "attributes-charset"
+      "\x00\x05"
+      "utf-8"
+      "\x05\x13\x00\x15"
+      "other-attribute-array"
+      "\x00\x05"
+      "first"
+      "\x13\x00\x00"
+      "\x00\x06"
+      "second\x03"
+      "test message"s;
+
+  SmartBuffer buf;
+  buf.Add(message);
+  EXPECT_TRUE(RemoveIppAttributes(&buf));
+
+  std::string body = "test message";
+  std::vector<uint8_t> expected(body.begin(), body.end());
+  EXPECT_EQ(buf.contents(), expected);
+}
+
+TEST(RemoveAttributes, NoEndTag) {
+  std::string message =
+      // IPP attributes.
+      "\x01\x47\x00\x12"
+      "attributes-charset"
+      "\x00\x05"
+      "utf-8"
+      "test image data"s;
+
+  SmartBuffer buf;
+  buf.Add(message);
+  EXPECT_FALSE(RemoveIppAttributes(&buf));
+}
+
+TEST(RemoveAttributes, InvalidAttributeSize) {
+  std::string message =
+      // IPP attributes.
+      "\x01\x47\x00\x12"
+      "attributes-charset"
+      "\x00\x06"
+      "utf-8"s;
+
+  SmartBuffer buf;
+  buf.Add(message);
+  EXPECT_FALSE(RemoveIppAttributes(&buf));
+}
+
 TEST(ExtractChunkSize, ValidChunk) {
   const std::string message =
       "1c\r\n"
