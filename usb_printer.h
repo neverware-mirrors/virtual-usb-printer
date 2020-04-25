@@ -40,28 +40,17 @@ class InterfaceManager {
   bool receiving_chunked() const { return receiving_chunked_; }
   void set_receiving_chunked(bool b) { receiving_chunked_ = b; }
 
-  const IppHeader& chunked_ipp_header() const { return chunked_ipp_header_; }
-  void SetChunkedIppHeader(const IppHeader& ipp_header) {
-    chunked_ipp_header_ = ipp_header;
-  }
-
   SmartBuffer* chunked_message() {
     return &chunked_message_;
   }
   void ChunkedMessageAdd(const SmartBuffer& message);
-
-  const SmartBuffer& document() const { return document_; }
-  void SetDocument(const SmartBuffer& document) { document_ = document; }
 
  private:
   std::queue<SmartBuffer> queue_;
   // Represents whether the interface is currently receiving an HTTP "chunked"
   // message.
   bool receiving_chunked_;
-  IppHeader chunked_ipp_header_;
   SmartBuffer chunked_message_;
-
-  SmartBuffer document_;
 };
 
 // A grouping of the descriptors for a USB device.

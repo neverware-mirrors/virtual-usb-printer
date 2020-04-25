@@ -209,12 +209,7 @@ void UsbPrinter::HandleIppUsbData(int sockfd,
 void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
                                          SmartBuffer* message) {
   InterfaceManager* im = GetInterfaceManager(usb_request.header.ep);
-  if (IsHttpChunkedMessage(*message)) {
-    // Exit in the case that |message| only contains the HTTP header.
-    if (!ContainsHttpBody(*message)) {
-      return;
-    }
-    im->SetChunkedIppHeader(GetIppHeader(*message));
+  if (ContainsHttpHeader(*message)) {
     RemoveHttpHeader(message);
   }
 
@@ -224,15 +219,20 @@ void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
 
   if (complete) {
     // The final chunk has been received.
-    if (record_document_) {
-      SmartBuffer* messages = im->chunked_message();
-      ExtractIppMessage(messages);
-      im->SetDocument(MergeDocument(messages));
-      LOG(INFO) << "Recording document...";
-      WriteDocument(im->document());
+    SmartBuffer* chunks = im->chunked_message();
+    // Assemble the chunks into the HTTP request body
+    SmartBuffer payload = MergeDocument(chunks);
+    base::Optional<IppHeader> header = IppHeader::Deserialize(&payload);
+    if (!header) {
+      LOG(ERROR) << "Request does not contain a valid IPP header; ignoring.";
+      return;
     }
-    const IppHeader& chunked_header = im->chunked_ipp_header();
-    SmartBuffer response = ipp_manager_.HandleIppRequest(chunked_header);
+    RemoveIppAttributes(&payload);
+    if (record_document_) {
+      LOG(INFO) << "Recording document...";
+      WriteDocument(payload);
+    }
+    SmartBuffer response = ipp_manager_.HandleIppRequest(header.value());
     QueueIppUsbResponse(usb_request, response);
   }
 }
