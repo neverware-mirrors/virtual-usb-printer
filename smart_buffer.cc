@@ -55,3 +55,14 @@ void SmartBuffer::Shrink(size_t size) {
   }
   buffer_.resize(size);
 }
+
+ssize_t SmartBuffer::FindFirstOccurrence(const std::string& target,
+                                         size_t start) const {
+  const std::vector<uint8_t>& contents = this->contents();
+  auto iter = std::search(contents.begin() + start, contents.end(),
+                          target.begin(), target.end());
+  if (iter == contents.end()) {
+    return -1;
+  }
+  return std::distance(contents.begin(), iter);
+}

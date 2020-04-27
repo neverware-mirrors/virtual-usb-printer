@@ -31,27 +31,14 @@ std::vector<IppAttribute> GetAttributes(const base::ListValue* attributes) {
   return ipp_attributes;
 }
 
-// Find first occurrence of |target| in |message| and return the index to where
-// it begins. If |target| does not appear in |message| then returns -1.
-ssize_t FindFirstOccurrence(const SmartBuffer& message,
-                            const std::string& target, size_t start = 0) {
-  const std::vector<uint8_t>& contents = message.contents();
-  auto iter = std::search(contents.begin() + start, contents.end(),
-                          target.begin(), target.end());
-  if (iter == contents.end()) {
-    return -1;
-  }
-  return std::distance(contents.begin(), iter);
-}
-
 // Determines if |message| starts with the string |target|.
 bool StartsWith(const SmartBuffer& message, const std::string& target) {
-  return FindFirstOccurrence(message, target) == 0;
+  return message.FindFirstOccurrence(target) == 0;
 }
 
 bool MessageContains(const SmartBuffer& message,
                      const std::string& s) {
-  ssize_t pos = FindFirstOccurrence(message, s);
+  ssize_t pos = message.FindFirstOccurrence(s);
   return pos != -1;
 }
 
@@ -338,7 +325,7 @@ void PackIppHeader(IppHeader* header) {
 }
 
 bool IsHttpChunkedMessage(const SmartBuffer& message) {
-  ssize_t i = FindFirstOccurrence(message, "Transfer-Encoding: chunked");
+  ssize_t i = message.FindFirstOccurrence("Transfer-Encoding: chunked");
   return i != -1;
 }
 
@@ -354,14 +341,14 @@ bool ContainsHttpBody(const SmartBuffer& message) {
   }
   // If |message| contains an HTTP header, check to see if there's anything
   // immediately following it.
-  ssize_t pos = FindFirstOccurrence(message, "\r\n\r\n");
+  ssize_t pos = message.FindFirstOccurrence("\r\n\r\n");
   CHECK_GE(pos, 0) << "HTTP header does not contain end-of-header marker";
   size_t start = pos + 4;
   return start < message.size();
 }
 
 IppHeader GetIppHeader(const SmartBuffer& message) {
-  ssize_t i = FindFirstOccurrence(message, "\r\n\r\n");
+  ssize_t i = message.FindFirstOccurrence("\r\n\r\n");
   size_t offset = 0;
   if (i != -1) {
     // If |message| starts with an HTTP header, jump to the beginning of the IPP
@@ -369,7 +356,7 @@ IppHeader GetIppHeader(const SmartBuffer& message) {
     if (IsHttpChunkedMessage(message)) {
       // If |message| is an HTTP chunked message header, jump to the beginning
       // of the first chunk.
-      i = FindFirstOccurrence(message, "\r\n", i + 4);
+      i = message.FindFirstOccurrence("\r\n", i + 4);
       offset = i + 2;
     } else {
       offset = i + 4;
@@ -397,7 +384,7 @@ bool RemoveIppAttributes(SmartBuffer* buf) {
 }
 
 size_t ExtractChunkSize(const SmartBuffer& message) {
-  ssize_t end = FindFirstOccurrence(message, "\r\n");
+  ssize_t end = message.FindFirstOccurrence("\r\n");
   if (end == -1) {
     return 0;
   }
@@ -418,7 +405,7 @@ SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message) {
   }
   size_t chunk_size = ExtractChunkSize(*message);
   LOG(INFO) << "Chunk size: " << chunk_size;
-  ssize_t start = FindFirstOccurrence(*message, "\r\n");
+  ssize_t start = message->FindFirstOccurrence("\r\n");
   SmartBuffer ret(0);
   if (start == -1) {
     return ret;
@@ -445,7 +432,7 @@ SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message) {
 }
 
 bool ContainsFinalChunk(const SmartBuffer& message) {
-  ssize_t i = FindFirstOccurrence(message, "0\r\n\r\n");
+  ssize_t i = message.FindFirstOccurrence("0\r\n\r\n");
   return i > 0 && message.size() == i + 5;
 }
 
@@ -453,7 +440,7 @@ bool ProcessMessageChunks(SmartBuffer* message) {
   CHECK(message != nullptr) << "Process - Given null message";
   if (IsHttpChunkedMessage(*message)) {
     // If |message| contains an HTTP header then we discard it.
-    int start = FindFirstOccurrence(*message, "\r\n\r\n");
+    int start = message->FindFirstOccurrence("\r\n\r\n");
     CHECK_GT(start, 0) << "Failed to process HTTP chunked message";
     message->Erase(0, start + 4);
   }
@@ -467,7 +454,7 @@ bool ProcessMessageChunks(SmartBuffer* message) {
 
 void RemoveHttpHeader(SmartBuffer* message) {
   CHECK(ContainsHttpHeader(*message)) << "Message does not contain HTTP header";
-  int i = FindFirstOccurrence(*message, "\r\n\r\n");
+  int i = message->FindFirstOccurrence("\r\n\r\n");
   CHECK_GT(i, 0) << "Failed to find end of HTTP header";
   message->Erase(0, i + 4);
 }

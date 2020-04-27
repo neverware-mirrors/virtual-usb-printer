@@ -58,6 +58,11 @@ class SmartBuffer {
   // Shrink the underlying vector to |size|.
   void Shrink(size_t size);
 
+  // Find first occurrence of |target| in the buffer and return the index to
+  // where it begins. If |target| does not appear in |message| then returns -1.
+  ssize_t FindFirstOccurrence(const std::string& target,
+                              size_t start = 0) const;
+
   size_t size() const { return buffer_.size(); }
   const std::vector<uint8_t>& contents() const { return buffer_; }
   const uint8_t* data() const { return buffer_.data(); }
