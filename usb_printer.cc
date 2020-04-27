@@ -21,6 +21,7 @@
 #include <base/logging.h>
 
 #include "device_descriptors.h"
+#include "http_util.h"
 #include "ipp_util.h"
 #include "server.h"
 #include "smart_buffer.h"

@@ -10,6 +10,7 @@ group("all") {
   ]
   if (use.test) {
     deps += [
+      ":http-util-testrunner",
       ":ipp-util-testrunner",
       ":load-config-testrunner",
       ":smart-buffer-testrunner",
@@ -29,6 +30,7 @@ executable("virtual-usb-printer") {
   sources = [
     "cups_constants.cc",
     "device_descriptors.cc",
+    "http_util.cc",
     "ipp_manager.cc",
     "ipp_util.cc",
     "load_config.cc",
@@ -47,6 +49,24 @@ if (use.test) {
     pkg_deps = [ "libchrome-test-${libbase_ver}" ]
   }
 
+  executable("http-util-testrunner") {
+    # TODO(oka); Remove //common-mk:test by making testrunner to public_config //common-mk:test
+    configs += [
+      "//common-mk:test",
+      ":target_defaults",
+      ":test_config",
+    ]
+    sources = [
+      "http_util.cc",
+      "http_util_test.cc",
+      "smart_buffer.cc",
+      "value_util.cc",
+    ]
+    deps = [
+      "//common-mk/testrunner",
+    ]
+  }
+
   executable("ipp-util-testrunner") {
     # TODO(oka); Remove //common-mk:test by making testrunner to public_config //common-mk:test
     configs += [
@@ -56,6 +76,7 @@ if (use.test) {
     ]
     sources = [
       "cups_constants.cc",
+      "http_util.cc",
       "ipp_test.cc",
       "ipp_util.cc",
       "smart_buffer.cc",
