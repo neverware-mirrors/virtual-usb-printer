@@ -4,8 +4,10 @@
 
 #include "http_util.h"
 
+#include <string>
 #include <vector>
 
+#include <base/containers/flat_map.h>
 #include <gtest/gtest.h>
 
 using std::string_literals::operator""s;
@@ -21,6 +23,84 @@ const std::vector<uint8_t> CreateByteVector(const std::string& str) {
 }
 
 }  // namespace
+
+TEST(HttpRequest, DeserializeNoHeaders) {
+  const std::string http_request = "GET /eSCL/ScannerStatus HTTP/1.1\r\n\r\n";
+
+  SmartBuffer buf;
+  buf.Add(http_request);
+  base::Optional<HttpRequest> opt_request = HttpRequest::Deserialize(&buf);
+  EXPECT_TRUE(opt_request.has_value());
+  HttpRequest request = opt_request.value();
+  EXPECT_EQ(request.method, "GET");
+  EXPECT_EQ(request.uri, "/eSCL/ScannerStatus");
+
+  EXPECT_EQ(request.headers.size(), 0);
+  EXPECT_FALSE(request.IsChunkedMessage());
+}
+
+TEST(HttpRequest, DeserializeChunked) {
+  const std::string http_request =
+      "POST /ipp/print HTTP/1.1\r\n"
+      "Content-Type: application/ipp\r\n"
+      "Date: Mon, 12 Nov 2018 19:17:31 GMT\r\n"
+      "Host: localhost:0\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "User-Agent: CUPS/2.2.8 (Linux 4.14.82; x86_64) IPP/2.0\r\n"
+      "Expect: 100-continue\r\n\r\n"
+      "request body";
+
+  SmartBuffer buf;
+  buf.Add(http_request);
+
+  base::Optional<HttpRequest> opt_request = HttpRequest::Deserialize(&buf);
+  EXPECT_TRUE(opt_request.has_value());
+  HttpRequest request = opt_request.value();
+  EXPECT_EQ(request.method, "POST");
+  EXPECT_EQ(request.uri, "/ipp/print");
+
+  HttpHeaders expected_headers{
+      {"Content-Type", "application/ipp"},
+      {"Date", "Mon, 12 Nov 2018 19:17:31 GMT"},
+      {"Host", "localhost:0"},
+      {"Transfer-Encoding", "chunked"},
+      {"User-Agent", "CUPS/2.2.8 (Linux 4.14.82; x86_64) IPP/2.0"},
+      {"Expect", "100-continue"},
+  };
+  EXPECT_EQ(request.headers, expected_headers);
+  EXPECT_TRUE(request.IsChunkedMessage());
+  EXPECT_EQ(buf.contents(), CreateByteVector("request body"));
+}
+
+TEST(HttpRequest, MalformedHeader) {
+  const std::string http_request =
+      "POST /ipp/print HTTP/1.1\r\n"
+      "Content-Type application/ipp\r\n\r\n";
+
+  SmartBuffer buf;
+  buf.Add(http_request);
+  EXPECT_FALSE(HttpRequest::Deserialize(&buf).has_value());
+}
+
+TEST(HttpRequest, MalformedRequestLine) {
+  const std::string http_request =
+      "GET /ipp/print HTTP1.1\r"
+      "Content-Type: application/ipp\r\n\r\n";
+
+  SmartBuffer buf;
+  buf.Add(http_request);
+  EXPECT_FALSE(HttpRequest::Deserialize(&buf).has_value());
+}
+
+TEST(HttpRequest, NoEndOfHeaderMarker) {
+  const std::string http_request =
+      "GET /ipp/print HTTP/1.1\r\n"
+      "Content-Type: application/ipp\r\n";
+
+  SmartBuffer buf;
+  buf.Add(http_request);
+  EXPECT_FALSE(HttpRequest::Deserialize(&buf).has_value());
+}
 
 TEST(IsHttpChunkedHeader, ContainsChunkedEncoding) {
   const std::string http_header =
@@ -191,8 +271,9 @@ TEST(RemoveHttpHeader, NoHeader) {
   const std::string message = "no http header";
   SmartBuffer message_buffer;
   message_buffer.Add(message);
-  EXPECT_DEATH(RemoveHttpHeader(&message_buffer),
-               "Message does not contain HTTP header");
+  SmartBuffer original_message_buffer = message_buffer;
+  EXPECT_FALSE(RemoveHttpHeader(&message_buffer));
+  EXPECT_EQ(message_buffer.contents(), original_message_buffer.contents());
 }
 
 TEST(RemoveHttpHeader, InvalidHeader) {
@@ -200,8 +281,9 @@ TEST(RemoveHttpHeader, InvalidHeader) {
       "POST /ipp/print HTTP/1.1 missing end of header indicator";
   SmartBuffer message_buffer;
   message_buffer.Add(message);
-  EXPECT_DEATH(RemoveHttpHeader(&message_buffer),
-               "Failed to find end of HTTP header");
+  SmartBuffer original_message_buffer = message_buffer;
+  EXPECT_FALSE(RemoveHttpHeader(&message_buffer));
+  EXPECT_EQ(message_buffer.contents(), original_message_buffer.contents());
 }
 
 TEST(MergeDocument, ValidMessage) {

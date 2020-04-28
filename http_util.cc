@@ -4,9 +4,16 @@
 
 #include "http_util.h"
 
+#include <algorithm>
 #include <vector>
 
+#include <base/strings/string_split.h>
+#include <base/strings/string_util.h>
+
 namespace {
+
+const std::string kHttpRequestEnd = "\r\n\r\n";  // NOLINT(runtime/string)
+const std::string kHttpLineEnd = "\r\n";         // NOLINT(runtime/string)
 
 // Determines if |message| starts with the string |target|.
 bool StartsWith(const SmartBuffer& message, const std::string& target) {
@@ -18,7 +25,107 @@ bool MessageContains(const SmartBuffer& message, const std::string& s) {
   return pos != -1;
 }
 
+base::Optional<HttpHeaders> ParseHttpHeaders(const std::string& headers) {
+  std::vector<std::string> lines = base::SplitStringUsingSubstr(
+      headers, kHttpLineEnd, base::KEEP_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
+
+  const std::string header_split = ":";
+  HttpHeaders parsed_headers;
+  for (const std::string& line : lines) {
+    size_t split = line.find(header_split);
+    if (split == std::string::npos) {
+      LOG(ERROR) << "Malformed header: '" << line << "'";
+      return base::nullopt;
+    }
+
+    parsed_headers.emplace(
+        line.substr(0, split),
+        base::TrimString(line.substr(split + header_split.size()), " ",
+                         base::TRIM_LEADING));
+  }
+  return parsed_headers;
+}
+
+bool ValidateHttpVersion(const std::string& version) {
+  std::vector<std::string> tokens = base::SplitString(
+      version, "/", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
+  if (tokens.size() != 2 || tokens[0] != "HTTP") {
+    LOG(ERROR) << "Malformed HTTP version: '" << version << "'";
+    return false;
+  }
+
+  // 1.0 support is prohibited by IPP spec for HTTP transport.
+  if (tokens[1] == "1.0") {
+    LOG(ERROR) << "HTTP version 1.0 is not supported";
+    return false;
+  }
+  return true;
+}
+
 }  // namespace
+
+// static
+base::Optional<HttpRequest> HttpRequest::Deserialize(SmartBuffer* message) {
+  ssize_t request_end = message->FindFirstOccurrence(kHttpRequestEnd);
+  if (request_end == -1) {
+    LOG(ERROR) << "Message does not contain end of header marker";
+    return base::nullopt;
+  }
+
+  ssize_t request_line_end = message->FindFirstOccurrence(kHttpLineEnd);
+  if (request_line_end == -1) {
+    LOG(ERROR) << "Message does not contain end of line marker";
+    return base::nullopt;
+  }
+
+  if (request_line_end == 0) {
+    LOG(ERROR) << "Request line is empty";
+    return base::nullopt;
+  }
+
+  // First parse the first line of the request, which should look something like
+  // "GET /ipp/print HTTP/1.1" or "POST /eSCL/ScannerCapabilities HTTP/1.1".
+  std::string request_line(message->data(), message->data() + request_line_end);
+  std::vector<std::string> request_line_tokens = base::SplitString(
+      request_line, " ", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
+
+  if (request_line_tokens.size() != 3) {
+    LOG(ERROR) << "Malformed request line: '" << request_line << "'";
+    return base::nullopt;
+  }
+
+  std::string http_version = request_line_tokens[2];
+  if (!ValidateHttpVersion(http_version))
+    return base::nullopt;
+
+  HttpRequest request;
+  request.method = request_line_tokens[0];
+  request.uri = request_line_tokens[1];
+
+  // Now, parse the rest of the HTTP request after the request line as headers.
+
+  // In case that there are no headers, make sure when we skip the kHttpLineEnd
+  // we aren't actually skipping past the kHttpRequestEnd marker.
+  size_t headers_start =
+      std::min<size_t>(request_line_end + kHttpLineEnd.size(), request_end);
+  std::string request_headers(message->data() + headers_start,
+                              message->data() + request_end);
+  base::Optional<HttpHeaders> headers = ParseHttpHeaders(request_headers);
+  if (!headers) {
+    LOG(ERROR) << "Failed to parse request headers";
+    return base::nullopt;
+  }
+  request.headers = headers.value();
+
+  // Erase the data we just parsed from |message|.
+  message->Erase(0, request_end + kHttpRequestEnd.size());
+  return request;
+}
+
+bool HttpRequest::IsChunkedMessage() const {
+  auto encoding = headers.find("Transfer-Encoding");
+  return encoding != headers.end() && encoding->second == "chunked";
+}
 
 bool IsHttpChunkedMessage(const SmartBuffer& message) {
   ssize_t i = message.FindFirstOccurrence("Transfer-Encoding: chunked");
@@ -112,11 +219,8 @@ bool ProcessMessageChunks(SmartBuffer* message) {
   return chunk.size() != 0;
 }
 
-void RemoveHttpHeader(SmartBuffer* message) {
-  CHECK(ContainsHttpHeader(*message)) << "Message does not contain HTTP header";
-  int i = message->FindFirstOccurrence("\r\n\r\n");
-  CHECK_GT(i, 0) << "Failed to find end of HTTP header";
-  message->Erase(0, i + 4);
+bool RemoveHttpHeader(SmartBuffer* message) {
+  return HttpRequest::Deserialize(message).has_value();
 }
 
 SmartBuffer ExtractIppMessage(SmartBuffer* message) {

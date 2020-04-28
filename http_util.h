@@ -7,7 +7,27 @@
 
 #include <string>
 
+#include <base/containers/flat_map.h>
+#include <base/optional.h>
+
 #include "smart_buffer.h"
+
+using HttpHeaders = base::flat_map<std::string, std::string>;
+class HttpRequest {
+ public:
+  // Attempts to parse an HttpRequest from the beginning of |message|.
+  // If successful, remove the header from |message|, so that it contains only
+  // the body of the http request.
+  static base::Optional<HttpRequest> Deserialize(SmartBuffer* message);
+
+  // Returns true if this header contains a request header indicating a chunked
+  // transfer encoding.
+  bool IsChunkedMessage() const;
+
+  std::string method;
+  std::string uri;
+  HttpHeaders headers;
+};
 
 bool IsHttpChunkedMessage(const SmartBuffer& message);
 
@@ -28,8 +48,11 @@ bool ContainsFinalChunk(const SmartBuffer& message);
 // to be received.
 bool ProcessMessageChunks(SmartBuffer* message);
 
-// Removes the HTTP header from |message|.
-void RemoveHttpHeader(SmartBuffer* message);
+// Removes the HTTP header from |message|, if one exists.
+// Returns true if |message| started with a valid header.
+// Returns false and does not modify |message| if it doesn't start with a valid
+// header.
+bool RemoveHttpHeader(SmartBuffer* message);
 
 // Extracts the IPP message from the first HTTP chunked message in |message|.
 // This function assumes that the first chunk in |message| contains the IPP
