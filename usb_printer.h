@@ -14,11 +14,10 @@
 #include <base/files/file_path.h>
 
 #include "device_descriptors.h"
+#include "http_util.h"
 #include "ipp_manager.h"
-#include "ipp_util.h"
 #include "smart_buffer.h"
 #include "usbip.h"
-#include "usbip_constants.h"
 
 // This class is responsible for managing an ippusb interface of a printer. It
 // keeps track of whether or not the interface is currently in the process of
@@ -41,6 +40,9 @@ class InterfaceManager {
   bool receiving_chunked() const { return receiving_chunked_; }
   void set_receiving_chunked(bool b) { receiving_chunked_ = b; }
 
+  HttpRequest chunked_request() const { return chunked_request_; }
+  void set_chunked_request(const HttpRequest& r) { chunked_request_ = r; }
+
   SmartBuffer* chunked_message() {
     return &chunked_message_;
   }
@@ -51,6 +53,7 @@ class InterfaceManager {
   // Represents whether the interface is currently receiving an HTTP "chunked"
   // message.
   bool receiving_chunked_;
+  HttpRequest chunked_request_;
   SmartBuffer chunked_message_;
 };
 
@@ -189,6 +192,9 @@ class UsbPrinter {
   InterfaceManager* GetInterfaceManager(int endpoint);
 
  private:
+  SmartBuffer GenerateHttpResponse(const HttpRequest& request,
+                                   SmartBuffer* body);
+
   void HandleGetStatus(int sockfd, const UsbipCmdSubmit& usb_request,
                        const UsbControlRequest& control_request) const;
 

@@ -135,7 +135,7 @@ base::Optional<size_t> GetAttributeLength(const std::vector<uint8_t>& bytes,
 // https://tools.ietf.org/html/rfc8010#section-3.2
 // See 'begin-attribute-group-tag'
 bool IsAttributeGroupTag(uint8_t tag) {
-  return (0x00 <= tag && tag < 0x02) || (0x04 <= tag && tag <= 0x0F);
+  return (0x00 <= tag && tag <= 0x02) || (0x04 <= tag && tag <= 0x0F);
 }
 
 // Get the length of an IPP attribute group in |bytes| starting at index

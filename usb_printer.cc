@@ -17,8 +17,9 @@
 
 #include <base/logging.h>
 
-#include "http_util.h"
+#include "ipp_util.h"
 #include "server.h"
+#include "usbip_constants.h"
 
 namespace {
 
@@ -195,32 +196,32 @@ void UsbPrinter::HandleIppUsbData(int sockfd,
   SendUsbDataResponse(sockfd, usb_request, received);
 
   InterfaceManager* im = GetInterfaceManager(usb_request.header.ep);
-  if (IsHttpChunkedMessage(message)) {
-    CHECK(!im->receiving_chunked())
-        << "Received new chunked message before previous chunked message could "
-           "be completed";
-    im->set_receiving_chunked(true);
-  }
-
   if (im->receiving_chunked()) {
     HandleChunkedIppUsbData(usb_request, &message);
-  } else {
-    // If we receive an HTTP message with no body, then skip it.
-    if (!ContainsHttpBody(message)) {
-      return;
-    }
-    IppHeader ipp_header = GetIppHeader(message);
-    SmartBuffer response = ipp_manager_.HandleIppRequest(ipp_header, message);
-    QueueIppUsbResponse(usb_request, response);
+    return;
   }
+
+  base::Optional<HttpRequest> opt_request = HttpRequest::Deserialize(&message);
+  if (!opt_request.has_value()) {
+    LOG(ERROR) << "Incoming message is not valid HTTP; ignoring";
+    return;
+  }
+
+  HttpRequest request = opt_request.value();
+  if (request.IsChunkedMessage()) {
+    im->set_receiving_chunked(true);
+    im->set_chunked_request(request);
+    HandleChunkedIppUsbData(usb_request, &message);
+    return;
+  }
+
+  SmartBuffer response = GenerateHttpResponse(request, &message);
+  QueueIppUsbResponse(usb_request, response);
 }
 
 void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
                                          SmartBuffer* message) {
   InterfaceManager* im = GetInterfaceManager(usb_request.header.ep);
-  if (ContainsHttpHeader(*message)) {
-    RemoveHttpHeader(message);
-  }
 
   bool complete = ContainsFinalChunk(*message);
   im->set_receiving_chunked(!complete);
@@ -231,14 +232,8 @@ void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
     SmartBuffer* chunks = im->chunked_message();
     // Assemble the chunks into the HTTP request body
     SmartBuffer payload = MergeDocument(chunks);
-    base::Optional<IppHeader> header = IppHeader::Deserialize(&payload);
-    if (!header) {
-      LOG(ERROR) << "Request does not contain a valid IPP header; ignoring.";
-      return;
-    }
-    RemoveIppAttributes(&payload);
     SmartBuffer response =
-        ipp_manager_.HandleIppRequest(header.value(), payload);
+        GenerateHttpResponse(im->chunked_request(), &payload);
     QueueIppUsbResponse(usb_request, response);
   }
 }
@@ -300,6 +295,27 @@ InterfaceManager* UsbPrinter::GetInterfaceManager(int endpoint) {
   CHECK_LT(index, interface_managers_.size())
       << "Received request on an invalid endpoint";
   return &interface_managers_[index];
+}
+
+SmartBuffer UsbPrinter::GenerateHttpResponse(const HttpRequest& request,
+                                             SmartBuffer* body) {
+  SmartBuffer response;
+  if (request.method == "POST" && request.uri == "/ipp/print") {
+    base::Optional<IppHeader> ipp_header = IppHeader::Deserialize(body);
+    if (!ipp_header) {
+      LOG(ERROR) << "Request does not contain a valid IPP header.";
+      return response;
+    }
+    if (!RemoveIppAttributes(body)) {
+      LOG(ERROR) << "IPP request has malformed attributes section.";
+      return response;
+    }
+    response = ipp_manager_.HandleIppRequest(ipp_header.value(), *body);
+  } else {
+    LOG(ERROR) << "Invalid method '" << request.method << "' and/or endpoint '"
+               << request.uri << "'";
+  }
+  return response;
 }
 
 void UsbPrinter::HandleGetStatus(
