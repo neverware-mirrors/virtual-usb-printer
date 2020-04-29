@@ -139,39 +139,6 @@ TEST(IsHttpChunkedHeader, ContainsChunkedEncoding) {
   EXPECT_TRUE(IsHttpChunkedMessage(buf));
 }
 
-TEST(ContainsHttpBody, ContainsHeader) {
-  const std::string message =
-      "POST /ipp/print HTTP/1.1\x0d\x0a\x0d\x0a"
-      // message body.
-      "\x02\x00\x00\x0b\x00\x00\x00\x01"s;
-
-  // We expect ContainsHttpBody to return true since |message| contains an HTTP
-  // header with contents immediately following the header.
-  std::vector<uint8_t> bytes = CreateByteVector(message);
-  SmartBuffer buf(bytes);
-  EXPECT_TRUE(ContainsHttpBody(buf));
-}
-
-TEST(ContainsHttpBody, NoBody) {
-  const std::string message = "POST /ipp/print HTTP/1.1\x0d\x0a\x0d\x0a";
-
-  // We expect ContainsHttpBody to return false since |message| contains an HTTP
-  // header with nothing immediately following it.
-  std::vector<uint8_t> bytes = CreateByteVector(message);
-  SmartBuffer buf(bytes);
-  EXPECT_FALSE(ContainsHttpBody(buf));
-}
-
-TEST(ContainsHttpBody, NoHttpHeader) {
-  const std::string message = "\x02\x00\x00\x0b\x00\x00\x00\x01"s;
-
-  // Since |message| does not contain an HTTP header, we assume that the
-  // contents are the message body.
-  std::vector<uint8_t> bytes = CreateByteVector(message);
-  SmartBuffer buf(bytes);
-  EXPECT_TRUE(ContainsHttpBody(buf));
-}
-
 TEST(ExtractChunkSize, ValidChunk) {
   const std::string message =
       "1c\r\n"
@@ -277,37 +244,6 @@ TEST(ProcessMessageChunks, MultipleChunks) {
   EXPECT_EQ(message_buffer2.size(), 0);
 }
 
-// Verify that GetHttpResponseHeader produces an HTTP header with the correct
-// value set for the "Content-Length" field.
-TEST(RemoveHttpHeader, ContainsHeader) {
-  const std::string message = "POST /ipp/print HTTP/1.1\r\n\r\ntest";
-  SmartBuffer message_buffer;
-  message_buffer.Add(message);
-  RemoveHttpHeader(&message_buffer);
-
-  const std::vector<uint8_t> expected = {'t', 'e', 's', 't'};
-  EXPECT_EQ(message_buffer.contents(), expected);
-}
-
-TEST(RemoveHttpHeader, NoHeader) {
-  const std::string message = "no http header";
-  SmartBuffer message_buffer;
-  message_buffer.Add(message);
-  SmartBuffer original_message_buffer = message_buffer;
-  EXPECT_FALSE(RemoveHttpHeader(&message_buffer));
-  EXPECT_EQ(message_buffer.contents(), original_message_buffer.contents());
-}
-
-TEST(RemoveHttpHeader, InvalidHeader) {
-  const std::string message =
-      "POST /ipp/print HTTP/1.1 missing end of header indicator";
-  SmartBuffer message_buffer;
-  message_buffer.Add(message);
-  SmartBuffer original_message_buffer = message_buffer;
-  EXPECT_FALSE(RemoveHttpHeader(&message_buffer));
-  EXPECT_EQ(message_buffer.contents(), original_message_buffer.contents());
-}
-
 TEST(MergeDocument, ValidMessage) {
   const std::string message =
       "6\r\n"
@@ -331,17 +267,4 @@ TEST(MergeDocument, ValidMessage) {
   SmartBuffer document = MergeDocument(&message_buffer);
   EXPECT_EQ(message_buffer.size(), 0);
   EXPECT_EQ(document.contents(), expected);
-}
-
-TEST(GetHttpResponseHeader, VerifyContentLength) {
-  // The value we expect to be set for the "Content-Length" field in the
-  // produced HTTP message.
-  const int content_length = 1234009;
-  const std::string expected =
-      "HTTP/1.1 200 OK\r\n"
-      "Server: localhost:0\r\n"
-      "Content-Type: application/ipp\r\n"
-      "Content-Length: 1234009\r\n"
-      "Connection: close\r\n\r\n";
-  EXPECT_EQ(GetHttpResponseHeader(content_length), expected);
 }

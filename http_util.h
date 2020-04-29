@@ -42,11 +42,6 @@ class HttpResponse {
 
 bool IsHttpChunkedMessage(const SmartBuffer& message);
 
-bool ContainsHttpHeader(const SmartBuffer& message);
-
-// Determines if |message| contains the body of an HTTP message.
-bool ContainsHttpBody(const SmartBuffer& message);
-
 size_t ExtractChunkSize(const SmartBuffer& message);
 
 SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message);
@@ -59,12 +54,6 @@ bool ContainsFinalChunk(const SmartBuffer& message);
 // to be received.
 bool ProcessMessageChunks(SmartBuffer* message);
 
-// Removes the HTTP header from |message|, if one exists.
-// Returns true if |message| started with a valid header.
-// Returns false and does not modify |message| if it doesn't start with a valid
-// header.
-bool RemoveHttpHeader(SmartBuffer* message);
-
 // Extracts the IPP message from the first HTTP chunked message in |message|.
 // This function assumes that the first chunk in |message| contains the IPP
 // message.
@@ -74,9 +63,5 @@ SmartBuffer ExtractIppMessage(SmartBuffer* message);
 // is assumed that |message| only contains the chunks which make up the received
 // document file.
 SmartBuffer MergeDocument(SmartBuffer* message);
-
-// Create a generic HTTP response header with the "Content-Length" field set to
-// |size|.
-std::string GetHttpResponseHeader(size_t size);
 
 #endif  // __HTTP_UTIL_H__

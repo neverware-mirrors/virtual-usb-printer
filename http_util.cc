@@ -20,11 +20,6 @@ bool StartsWith(const SmartBuffer& message, const std::string& target) {
   return message.FindFirstOccurrence(target) == 0;
 }
 
-bool MessageContains(const SmartBuffer& message, const std::string& s) {
-  ssize_t pos = message.FindFirstOccurrence(s);
-  return pos != -1;
-}
-
 base::Optional<HttpHeaders> ParseHttpHeaders(const std::string& headers) {
   std::vector<std::string> lines = base::SplitStringUsingSubstr(
       headers, kHttpLineEnd, base::KEEP_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
@@ -152,24 +147,6 @@ bool IsHttpChunkedMessage(const SmartBuffer& message) {
   return i != -1;
 }
 
-bool ContainsHttpHeader(const SmartBuffer& message) {
-  return MessageContains(message, "POST /ipp/print HTTP");
-}
-
-bool ContainsHttpBody(const SmartBuffer& message) {
-  // We are making the assumption that if |message| does not contain an HTTP
-  // header then |message| is the body of an HTTP message.
-  if (!ContainsHttpHeader(message)) {
-    return true;
-  }
-  // If |message| contains an HTTP header, check to see if there's anything
-  // immediately following it.
-  ssize_t pos = message.FindFirstOccurrence("\r\n\r\n");
-  CHECK_GE(pos, 0) << "HTTP header does not contain end-of-header marker";
-  size_t start = pos + 4;
-  return start < message.size();
-}
-
 size_t ExtractChunkSize(const SmartBuffer& message) {
   ssize_t end = message.FindFirstOccurrence("\r\n");
   if (end == -1) {
@@ -239,10 +216,6 @@ bool ProcessMessageChunks(SmartBuffer* message) {
   return chunk.size() != 0;
 }
 
-bool RemoveHttpHeader(SmartBuffer* message) {
-  return HttpRequest::Deserialize(message).has_value();
-}
-
 SmartBuffer ExtractIppMessage(SmartBuffer* message) {
   CHECK_NE(message, nullptr) << "Received null message";
   return ParseHttpChunkedMessage(message);
@@ -256,14 +229,4 @@ SmartBuffer MergeDocument(SmartBuffer* message) {
     document.Add(chunk);
   }
   return document;
-}
-
-std::string GetHttpResponseHeader(size_t size) {
-  return "HTTP/1.1 200 OK\r\n"
-         "Server: localhost:0\r\n"
-         "Content-Type: application/ipp\r\n"
-         "Content-Length: " +
-         std::to_string(size) +
-         "\r\n"
-         "Connection: close\r\n\r\n";
 }

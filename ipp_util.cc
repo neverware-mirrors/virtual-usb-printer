@@ -329,41 +329,6 @@ void IppHeader::Serialize(SmartBuffer* buf) {
   buf->Add(&header_copy, sizeof(header_copy));
 }
 
-void UnpackIppHeader(IppHeader* header) {
-  header->operation_id = ntohs(header->operation_id);
-  header->request_id = ntohl(header->request_id);
-}
-
-void PackIppHeader(IppHeader* header) {
-  header->operation_id = htons(header->operation_id);
-  header->request_id = htonl(header->request_id);
-}
-
-IppHeader GetIppHeader(const SmartBuffer& message) {
-  ssize_t i = message.FindFirstOccurrence("\r\n\r\n");
-  size_t offset = 0;
-  if (i != -1) {
-    // If |message| starts with an HTTP header, jump to the beginning of the IPP
-    // message.
-    if (IsHttpChunkedMessage(message)) {
-      // If |message| is an HTTP chunked message header, jump to the beginning
-      // of the first chunk.
-      i = message.FindFirstOccurrence("\r\n", i + 4);
-      offset = i + 2;
-    } else {
-      offset = i + 4;
-    }
-  }
-  IppHeader header;
-  // Ensure that |message| has enough bytes to copy into |header|.
-  CHECK_GE(message.size(), offset);
-  CHECK_GE(message.size() - offset, sizeof(header));
-  memset(&header, 0, sizeof(header));
-  memcpy(&header, message.data() + offset, sizeof(header));
-  UnpackIppHeader(&header);
-  return header;
-}
-
 bool RemoveIppAttributes(SmartBuffer* buf) {
   base::Optional<size_t> length = GetAttributesLength(buf->contents());
   if (!length) {

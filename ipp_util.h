@@ -110,11 +110,6 @@ class IppHeader {
   int request_id;
 };
 
-void PackIppHeader(IppHeader* header);
-void UnpackIppHeader(IppHeader* header);
-
-IppHeader GetIppHeader(const SmartBuffer& message);
-
 // Strip leading IPP attributes from |buf|.
 // Returns true and strips leading attributes if |buf| starts with well-formed
 // IPP attributes.
