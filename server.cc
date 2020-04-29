@@ -57,7 +57,7 @@ sockaddr_in BindServerSocket(const base::ScopedFD& sockfd) {
   server.sin_port = htons(TCP_SERV_PORT);
 
   sockaddr* server_socket = reinterpret_cast<sockaddr*>(&server);
-  if (bind(sockfd.get(), server_socket, sizeof(server_socket)) < 0) {
+  if (bind(sockfd.get(), server_socket, sizeof(server)) < 0) {
     LOG(ERROR) << "Bind error: " << strerror(errno);
     exit(1);
   }
