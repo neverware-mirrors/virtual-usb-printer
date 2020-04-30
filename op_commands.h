@@ -19,12 +19,12 @@
  * https://en.opensuse.org/SDB:USBIP
  */
 
+#include <cstdlib>
+#include <vector>
+
 #include "device_descriptors.h"
 #include "smart_buffer.h"
 #include "usbip_constants.h"
-
-#include <cstdlib>
-#include <vector>
 
 // Forward declaration of UsbPrinter.
 class UsbPrinter;

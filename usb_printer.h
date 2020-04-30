@@ -5,13 +5,6 @@
 #ifndef __USBIP_USB_PRINTER_H__
 #define __USBIP_USB_PRINTER_H__
 
-#include "device_descriptors.h"
-#include "ipp_manager.h"
-#include "ipp_util.h"
-#include "smart_buffer.h"
-#include "usbip.h"
-#include "usbip_constants.h"
-
 #include <map>
 #include <queue>
 #include <vector>
@@ -19,6 +12,13 @@
 
 #include <base/files/file.h>
 #include <base/files/file_path.h>
+
+#include "device_descriptors.h"
+#include "ipp_manager.h"
+#include "ipp_util.h"
+#include "smart_buffer.h"
+#include "usbip.h"
+#include "usbip_constants.h"
 
 // This class is responsible for managing an ippusb interface of a printer. It
 // keeps track of whether or not the interface is currently in the process of

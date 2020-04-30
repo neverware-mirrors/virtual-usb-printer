@@ -4,10 +4,6 @@
 
 #include "load_config.h"
 
-#include "device_descriptors.h"
-#include "usbip_constants.h"
-#include "value_util.h"
-
 #include <vector>
 #include <map>
 #include <memory>
@@ -15,6 +11,10 @@
 #include <base/values.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include "device_descriptors.h"
+#include "usbip_constants.h"
+#include "value_util.h"
 
 namespace {
 

@@ -4,10 +4,11 @@
 
 #include "server.h"
 
-#include "device_descriptors.h"
-#include "op_commands.h"
-#include "usbip.h"
-#include "usbip_constants.h"
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -18,13 +19,12 @@
 #include <memory>
 #include <utility>
 
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <sys/un.h>
-#include <unistd.h>
-
 #include <base/logging.h>
+
+#include "device_descriptors.h"
+#include "op_commands.h"
+#include "usbip.h"
+#include "usbip_constants.h"
 
 namespace {
 

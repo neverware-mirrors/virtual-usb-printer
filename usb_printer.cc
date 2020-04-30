@@ -4,28 +4,22 @@
 
 #include "usb_printer.h"
 
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <memory>
 #include <utility>
-#include <vector>
-
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 #include <base/files/file_util.h>
 #include <base/logging.h>
 
-#include "device_descriptors.h"
 #include "http_util.h"
-#include "ipp_util.h"
 #include "server.h"
-#include "smart_buffer.h"
-#include "usbip.h"
-#include "usbip_constants.h"
 
 namespace {
 

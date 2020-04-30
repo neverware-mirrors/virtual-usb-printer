@@ -77,8 +77,8 @@ if (use.test) {
     sources = [
       "cups_constants.cc",
       "http_util.cc",
-      "ipp_test.cc",
       "ipp_util.cc",
+      "ipp_util_test.cc",
       "smart_buffer.cc",
       "value_util.cc",
     ]

@@ -4,11 +4,12 @@
 
 #include "ipp_util.h"
 
+#include <arpa/inet.h>
+
 #include <map>
 #include <set>
 #include <string>
 
-#include <arpa/inet.h>
 #include <base/optional.h>
 #include <base/values.h>
 

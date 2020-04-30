@@ -13,8 +13,6 @@
 #include "usb_printer.h"
 #include "usbip_constants.h"
 
-#include <base/logging.h>
-
 void PackUsbip(int* data, size_t msg_size) {
   int size = msg_size / 4;
   for (int i = 0; i < size; i++) {

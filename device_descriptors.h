@@ -5,9 +5,9 @@
 #ifndef __DEVICE_DESCRIPTORS_H__
 #define __DEVICE_DESCRIPTORS_H__
 
-#include "usbip_constants.h"
-
 #include <cstdint>
+
+#include "usbip_constants.h"
 
 // USB Descriptors implemented according to:
 // Universal Serial Bus Specification Revision 2.0

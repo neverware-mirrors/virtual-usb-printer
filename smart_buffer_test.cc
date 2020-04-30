@@ -4,12 +4,12 @@
 
 #include "smart_buffer.h"
 
-#include "device_descriptors.h"
-
 #include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include "device_descriptors.h"
 
 namespace {
 

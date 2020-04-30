@@ -5,12 +5,12 @@
 #ifndef __VALUD_UTIL_H__
 #define __VALUD_UTIL_H__
 
+#include <memory>
+#include <string>
+
 #include <base/json/json_reader.h>
 #include <base/optional.h>
 #include <base/values.h>
-
-#include <memory>
-#include <string>
 
 // Attempt to load the contents of the JSON file located at |file_path| and
 // return the contents in a string.

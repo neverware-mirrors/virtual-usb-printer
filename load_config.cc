@@ -4,9 +4,6 @@
 
 #include "load_config.h"
 
-#include "device_descriptors.h"
-#include "usbip_constants.h"
-
 #include <climits>
 #include <cstdio>
 #include <map>
@@ -18,6 +15,9 @@
 #include <base/json/json_reader.h>
 #include <base/values.h>
 #include <brillo/syslog_logging.h>
+
+#include "device_descriptors.h"
+#include "usbip_constants.h"
 
 namespace {
 

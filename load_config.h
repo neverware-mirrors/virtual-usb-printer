@@ -9,10 +9,10 @@
 #include <vector>
 #include <string>
 
+#include <base/values.h>
+
 #include "device_descriptors.h"
 #include "usbip_constants.h"
-
-#include <base/values.h>
 
 // Extract the uint8_t value associated with the key |path| from |dict|.
 uint8_t GetByteValue(const base::DictionaryValue* dict,
