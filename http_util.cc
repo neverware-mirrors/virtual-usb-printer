@@ -127,6 +127,26 @@ bool HttpRequest::IsChunkedMessage() const {
   return encoding != headers.end() && encoding->second == "chunked";
 }
 
+void HttpResponse::Serialize(SmartBuffer* buf) const {
+  buf->Add("HTTP/1.1 ");
+  buf->Add(status);
+  buf->Add("\r\n");
+
+  HttpHeaders headers_copy = headers;
+  // Add standard headers
+  headers_copy["Server"] = "localhost:0";
+  headers_copy["Connection"] = "close";
+  headers_copy["Content-Length"] = std::to_string(body.size());
+  for (auto header : headers_copy) {
+    buf->Add(header.first);
+    buf->Add(": ");
+    buf->Add(header.second);
+    buf->Add("\r\n");
+  }
+  buf->Add("\r\n");
+  buf->Add(body);
+}
+
 bool IsHttpChunkedMessage(const SmartBuffer& message) {
   ssize_t i = message.FindFirstOccurrence("Transfer-Encoding: chunked");
   return i != -1;

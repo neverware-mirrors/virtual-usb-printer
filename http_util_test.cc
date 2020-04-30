@@ -102,6 +102,28 @@ TEST(HttpRequest, NoEndOfHeaderMarker) {
   EXPECT_FALSE(HttpRequest::Deserialize(&buf).has_value());
 }
 
+TEST(HttpResponse, Serialize) {
+  HttpResponse response;
+  response.status = "200 OK";
+  response.headers["Test"] = "Header";
+  response.body.Add("[body]");
+
+  SmartBuffer serialized;
+  response.Serialize(&serialized);
+
+  const std::string expected_response =
+      "HTTP/1.1 200 OK\r\n"
+      "Connection: close\r\n"
+      "Content-Length: 6\r\n"
+      "Server: localhost:0\r\n"
+      "Test: Header\r\n\r\n"
+      "[body]"s;
+
+  const std::string actual_response(serialized.contents().begin(),
+                                    serialized.contents().end());
+  EXPECT_EQ(actual_response, expected_response);
+}
+
 TEST(IsHttpChunkedHeader, ContainsChunkedEncoding) {
   const std::string http_header =
       "POST /ipp/print HTTP/1.1\x0d\x0a"

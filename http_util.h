@@ -29,6 +29,17 @@ class HttpRequest {
   HttpHeaders headers;
 };
 
+class HttpResponse {
+ public:
+  std::string status;
+  HttpHeaders headers;
+  SmartBuffer body;
+
+  // Serializes this HttpResponse to the textual format specified by the HTTP
+  // standard and appends it to the contents of |buf|.
+  void Serialize(SmartBuffer* buf) const;
+};
+
 bool IsHttpChunkedMessage(const SmartBuffer& message);
 
 bool ContainsHttpHeader(const SmartBuffer& message);
