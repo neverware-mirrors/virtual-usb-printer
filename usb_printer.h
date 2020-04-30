@@ -192,8 +192,8 @@ class UsbPrinter {
   InterfaceManager* GetInterfaceManager(int endpoint);
 
  private:
-  SmartBuffer GenerateHttpResponse(const HttpRequest& request,
-                                   SmartBuffer* body);
+  HttpResponse GenerateHttpResponse(const HttpRequest& request,
+                                    SmartBuffer* body);
 
   void HandleGetStatus(int sockfd, const UsbipCmdSubmit& usb_request,
                        const UsbControlRequest& control_request) const;
@@ -227,8 +227,8 @@ class UsbPrinter {
   void HandleGetDeviceId(int sockfd, const UsbipCmdSubmit& usb_request,
                          const UsbControlRequest& control_request) const;
 
-  void QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
-                           const SmartBuffer& attributes_buffer);
+  void QueueHttpResponse(const UsbipCmdSubmit& usb_request,
+                         const HttpResponse& response);
 
   // Responds to a BULK_IN request by replying with the message at the front of
   // |message_queue_|.

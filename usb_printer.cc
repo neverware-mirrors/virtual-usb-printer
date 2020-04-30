@@ -215,8 +215,8 @@ void UsbPrinter::HandleIppUsbData(int sockfd,
     return;
   }
 
-  SmartBuffer response = GenerateHttpResponse(request, &message);
-  QueueIppUsbResponse(usb_request, response);
+  HttpResponse response = GenerateHttpResponse(request, &message);
+  QueueHttpResponse(usb_request, response);
 }
 
 void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
@@ -232,9 +232,9 @@ void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
     SmartBuffer* chunks = im->chunked_message();
     // Assemble the chunks into the HTTP request body
     SmartBuffer payload = MergeDocument(chunks);
-    SmartBuffer response =
+    HttpResponse response =
         GenerateHttpResponse(im->chunked_request(), &payload);
-    QueueIppUsbResponse(usb_request, response);
+    QueueHttpResponse(usb_request, response);
   }
 }
 
@@ -297,23 +297,28 @@ InterfaceManager* UsbPrinter::GetInterfaceManager(int endpoint) {
   return &interface_managers_[index];
 }
 
-SmartBuffer UsbPrinter::GenerateHttpResponse(const HttpRequest& request,
-                                             SmartBuffer* body) {
-  SmartBuffer response;
+HttpResponse UsbPrinter::GenerateHttpResponse(const HttpRequest& request,
+                                              SmartBuffer* body) {
+  HttpResponse response;
   if (request.method == "POST" && request.uri == "/ipp/print") {
     base::Optional<IppHeader> ipp_header = IppHeader::Deserialize(body);
     if (!ipp_header) {
       LOG(ERROR) << "Request does not contain a valid IPP header.";
+      response.status = "415 Unsupported Media Type";
       return response;
     }
     if (!RemoveIppAttributes(body)) {
       LOG(ERROR) << "IPP request has malformed attributes section.";
+      response.status = "415 Unsupported Media Type";
       return response;
     }
-    response = ipp_manager_.HandleIppRequest(ipp_header.value(), *body);
+    response.status = "200 OK";
+    response.headers["Content-Type"] = "application/ipp";
+    response.body = ipp_manager_.HandleIppRequest(ipp_header.value(), *body);
   } else {
     LOG(ERROR) << "Invalid method '" << request.method << "' and/or endpoint '"
                << request.uri << "'";
+    response.status = "404 Not Found";
   }
   return response;
 }
@@ -479,13 +484,10 @@ void UsbPrinter::HandleGetDeviceId(
   SendUsbControlResponse(sockfd, usb_request, response.data(), response.size());
 }
 
-void UsbPrinter::QueueIppUsbResponse(const UsbipCmdSubmit& usb_request,
-                                     const SmartBuffer& attributes_buffer) {
-  const std::string http_header =
-      GetHttpResponseHeader(attributes_buffer.size());
-  SmartBuffer http_message(http_header.size());
-  http_message.Add(http_header.c_str(), http_header.size());
-  http_message.Add(attributes_buffer);
+void UsbPrinter::QueueHttpResponse(const UsbipCmdSubmit& usb_request,
+                                   const HttpResponse& response) {
+  SmartBuffer http_message;
+  response.Serialize(&http_message);
 
   LOG(INFO) << "Queueing ipp response...";
   InterfaceManager* im = GetInterfaceManager(usb_request.header.ep);
