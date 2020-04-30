@@ -304,6 +304,30 @@ bool operator!=(const IppAttribute& lhs, const IppAttribute& rhs) {
   return !(lhs == rhs);
 }
 
+// static
+base::Optional<IppHeader> IppHeader::Deserialize(SmartBuffer* message) {
+  // Ensure that |message| has enough bytes to copy into |header|.
+  if (message->size() < sizeof(IppHeader))
+    return base::nullopt;
+
+  IppHeader header;
+  memset(&header, 0, sizeof(header));
+  memcpy(&header, message->data(), sizeof(header));
+
+  header.operation_id = ntohs(header.operation_id);
+  header.request_id = ntohl(header.request_id);
+
+  message->Erase(0, sizeof(header));
+  return header;
+}
+
+void IppHeader::Serialize(SmartBuffer* buf) {
+  IppHeader header_copy = *this;
+  header_copy.operation_id = htons(header_copy.operation_id);
+  header_copy.request_id = htonl(header_copy.request_id);
+  buf->Add(&header_copy, sizeof(header_copy));
+}
+
 void UnpackIppHeader(IppHeader* header) {
   header->operation_id = ntohs(header->operation_id);
   header->request_id = ntohl(header->request_id);
@@ -412,12 +436,6 @@ IppTag GetIppTag(const std::string& name) {
     exit(1);
   }
   return iter->second;
-}
-
-void AddIppHeader(const IppHeader& header, SmartBuffer* buf) {
-  IppHeader header_copy = header;
-  PackIppHeader(&header_copy);
-  buf->Add(&header_copy, sizeof(header_copy));
 }
 
 void AddEndOfAttributes(SmartBuffer* buf) {

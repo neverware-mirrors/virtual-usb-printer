@@ -124,6 +124,41 @@ TEST(GetIppHeader, NoHttpHeader) {
   EXPECT_EQ(ipp_header.request_id, 7);
 }
 
+TEST(IppHeader, DeserializeValid) {
+  std::vector<uint8_t> message = {0x02, 0x00, 0x00, 0x06, 0x00, 0x00,
+                                  0x00, 0x07, 0x00, 0x01, 0x70, 0x29};
+  SmartBuffer buf(message);
+  base::Optional<IppHeader> opt_ipp_header = IppHeader::Deserialize(&buf);
+  EXPECT_TRUE(opt_ipp_header);
+  IppHeader ipp_header = opt_ipp_header.value();
+
+  EXPECT_EQ(ipp_header.major, 2);
+  EXPECT_EQ(ipp_header.minor, 0);
+  EXPECT_EQ(ipp_header.operation_id, 0x0006);
+  EXPECT_EQ(ipp_header.request_id, 7);
+}
+
+TEST(IppHeader, DeserializeInvalid) {
+  std::vector<uint8_t> message = {0x02, 0x00, 0x00, 0x06, 0x00, 0x00};
+  SmartBuffer buf(message);
+  EXPECT_FALSE(IppHeader::Deserialize(&buf));
+}
+
+TEST(IppHeader, Serialize) {
+  IppHeader header;
+  header.major = 2;
+  header.minor = 0;
+  header.operation_id = 0x0009;
+  header.request_id = 0x22330077;
+
+  SmartBuffer buf;
+  header.Serialize(&buf);
+  EXPECT_EQ(buf.size(), sizeof(IppHeader));
+  std::vector<uint8_t> expected = {0x02, 0x00, 0x00, 0x09,
+                                   0x22, 0x33, 0x00, 0x77};
+  EXPECT_EQ(buf.contents(), expected);
+}
+
 TEST(RemoveAttributes, HasEndTag) {
   std::string message =
       // IPP attributes.
@@ -594,19 +629,6 @@ TEST(IppAttributeGetBytes, InvalidAttributes) {
   std::unique_ptr<base::Value> value3 = GetJSONValue(json_contents3);
   IppAttribute attribute3 = GetAttribute(value3.get());
   EXPECT_DEATH(attribute3.GetBytes(), "Retrieved byte value is too large");
-}
-
-TEST(AddIppHeader, ValidHeader) {
-  IppHeader header;
-  header.major = 2;
-  header.minor = 0;
-  header.operation_id = 11;
-  header.request_id = 3;
-  std::vector<uint8_t> expected = {0x02, 0x00, 0x00, 0x0b,
-                                   0x00, 0x00, 0x00, 0x03};
-  SmartBuffer result(expected.size());
-  AddIppHeader(header, &result);
-  EXPECT_EQ(expected, result.contents());
 }
 
 TEST(AddPrinterAttributes, ValidAttributes) {
