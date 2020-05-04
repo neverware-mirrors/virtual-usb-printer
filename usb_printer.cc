@@ -15,7 +15,6 @@
 #include <memory>
 #include <utility>
 
-#include <base/files/file_util.h>
 #include <base/logging.h>
 
 #include "http_util.h"
@@ -55,6 +54,23 @@ UsbControlRequest CreateUsbControlRequest(int64_t setup) {
   request.wIndex1 = (setup & INDEX_1_MASK) >> 16;
   request.wLength = ntohs(setup & LENGTH_MASK);
   return request;
+}
+
+// Appends |buf| to the file at |path|. If no file exists at |path|, it is
+// created.
+void AppendToFile(base::FilePath path, SmartBuffer buf) {
+  base::File file(path, base::File::FLAG_OPEN_ALWAYS | base::File::FLAG_WRITE |
+                            base::File::FLAG_APPEND);
+  if (!file.IsValid()) {
+    LOG(ERROR) << "Failed to open/create file at " << path;
+    return;
+  }
+
+  int written = file.WriteAtCurrentPos(
+      reinterpret_cast<const char*>(buf.data()), buf.size());
+  if (written != buf.size()) {
+    PLOG(ERROR) << "Failed to write buf to file at " << path;
+  }
 }
 
 }  // namespace
@@ -165,13 +181,7 @@ void UsbPrinter::HandleUsbData(int sockfd,
   SendUsbDataResponse(sockfd, usb_request, received);
   if (!document_output_path_.empty()) {
     LOG(INFO) << "Recording document...";
-    int written = base::WriteFile(document_output_path_,
-                                  reinterpret_cast<const char*>(data.data()),
-                                  data.size());
-    if (written != data.size()) {
-      PLOG(ERROR) << "Failed to write document to file: "
-                  << document_output_path_;
-    }
+    AppendToFile(document_output_path_, data);
   }
 }
 
