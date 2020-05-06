@@ -40,6 +40,9 @@ class SmartBuffer {
   // |s.size()| to extract the underlying pointer and size of the data.
   void Add(const std::string& s);
 
+  // Specialized Add method for char* that uses strlen.
+  void Add(const char* s);
+
   // Adds the contents from |buf|.
   void Add(const SmartBuffer& buf);
 
@@ -79,6 +82,9 @@ void SmartBuffer::Add(const T* data, size_t data_size) {
 
 template <typename T>
 void SmartBuffer::Add(const T& data) {
+  static_assert(!std::is_pointer<T>::value,
+                "cannot use Add(const T&) for pointer types. If you want to "
+                "Add a pointer type, use Add(const T* data, size)");
   Add(&data, sizeof(data));
 }
 

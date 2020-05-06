@@ -21,6 +21,10 @@ void SmartBuffer::Add(const std::string& s) {
   Add(s.c_str(), s.size());
 }
 
+void SmartBuffer::Add(const char* s) {
+  Add(s, strlen(s));
+}
+
 // Adds the contents from |buf|.
 void SmartBuffer::Add(const SmartBuffer& buf) {
   const std::vector<uint8_t> contents = buf.contents();

@@ -103,6 +103,15 @@ TEST(Add, AddSmartBufferRange) {
   EXPECT_EQ(to_extend.contents(), expected);
 }
 
+TEST(Add, AddDynamicCharPointer) {
+  std::string input("TEST");
+
+  SmartBuffer buf;
+  buf.Add(input.c_str());
+  const std::vector<uint8_t> expected = {'T', 'E', 'S', 'T'};
+  EXPECT_EQ(buf.contents(), expected);
+}
+
 TEST(Erase, EraseSmartBufferRange) {
   SmartBuffer buf({1, 2, 3, 4, 5});
   const std::vector<uint8_t> expected = {1, 5};
