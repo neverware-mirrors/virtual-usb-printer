@@ -76,8 +76,9 @@ int main(int argc, char* argv[]) {
   }
 
   base::JSONReader json_reader;
+  // TODO(crbug/1054279): migrate to base::JSONReader::Read after uprev.
   std::unique_ptr<base::Value> descriptors =
-      json_reader.Read(*descriptors_contents);
+      json_reader.ReadDeprecated(*descriptors_contents);
   if (descriptors == nullptr) {
     LOG(ERROR) << "Failed to parse " << FLAGS_descriptors_path;
     return 1;
@@ -104,7 +105,8 @@ int main(int argc, char* argv[]) {
                  << FLAGS_attributes_path;
       return 1;
     }
-    attributes = json_reader.Read(*attributes_contents);
+    // TODO(crbug/1054279): migrate to base::JSONReader::Read after uprev.
+    attributes = json_reader.ReadDeprecated(*attributes_contents);
     if (attributes == nullptr) {
       LOG(ERROR) << "Failed to parse " << FLAGS_attributes_path;
       return 1;

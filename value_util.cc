@@ -21,7 +21,9 @@ base::Optional<std::string> GetJSONContents(const std::string& file_path) {
 
 std::unique_ptr<base::Value> GetJSONValue(const std::string& json_contents) {
   base::JSONReader json_reader;
-  std::unique_ptr<base::Value> value = json_reader.Read(json_contents);
+  // TODO(crbug/1054279): migrate to base::JSONReader::Read after uprev.
+  std::unique_ptr<base::Value> value =
+      json_reader.ReadDeprecated(json_contents);
   CHECK(value) << "Failed to parse JSON string";
   return value;
 }
