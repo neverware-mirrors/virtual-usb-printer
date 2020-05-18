@@ -8,7 +8,9 @@
 #include <string>
 #include <vector>
 
+#include <base/containers/flat_map.h>
 #include <base/optional.h>
+#include <base/time/time.h>
 #include <base/values.h>
 
 #include "http_util.h"
@@ -29,8 +31,30 @@ struct ScannerCapabilities {
 base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
     const base::Value& config);
 
+// The possible states for a scan job.
+enum JobState {
+  // The job was cancelled before it could be completed.
+  kCanceled,
+  // The document has been scanned, and scan data has been sent to the client.
+  kCompleted,
+  // The document may be in the process of scanning. Image data (if any has
+  // been scanned yet) has not been sent to the client.
+  kPending,
+};
+
+// The information tracked for a particular scan job.
+struct JobInfo {
+  // The time when the job was created.
+  base::TimeTicks created;
+  // The current state of the job.
+  JobState state;
+};
+
 struct ScannerStatus {
   bool idle;
+  // All of the scan jobs for this scanner.
+  // Keys are v4 UUIDs. Scan jobs may be in any state.
+  base::flat_map<std::string, JobInfo> jobs;
 };
 
 // This class is responsible for generating responses to eSCL requests sent

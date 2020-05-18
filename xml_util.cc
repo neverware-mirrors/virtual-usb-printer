@@ -115,6 +115,67 @@ UniqueXmlNodePtr SourceCapabilitiesAsXml(const SourceCapabilities& caps,
   return root;
 }
 
+// Serialize a map of UUIDs to JobInfo into the XML format expected for
+// eSCL ScannerStatus.
+// Returns a node which can be merged into the larger XML document.
+UniqueXmlNodePtr JobListAsXml(const base::flat_map<std::string, JobInfo>& jobs,
+                              namespace_map* namespaces) {
+  xmlNs* pwg = (*namespaces)[kPwgNs];
+  xmlNs* scan = (*namespaces)[kScanNs];
+
+  UniqueXmlNodePtr root(xmlNewNode(scan, XmlCast("Jobs")));
+  for (const auto& job : jobs) {
+    const std::string& uuid = job.first;
+    const JobInfo& info = job.second;
+    xmlNode* job_info = AddNode(root.get(), scan, "JobInfo");
+    AddNodeWithContent(job_info, pwg, "JobUri", "/eSCL/ScanJobs/" + uuid);
+    AddNodeWithContent(job_info, pwg, "JobUuid", "urn:uuid:" + uuid);
+
+    // Different scanners are not consistent with how they report scan job age.
+    // Arbitrarily report age as elapsed seconds.
+    base::TimeDelta elapsed = base::TimeTicks::Now() - info.created;
+    AddNodeWithContent(job_info, scan, "Age",
+                       std::to_string(elapsed.InSeconds()));
+
+    int images_completed = 0;
+    int images_to_transfer = 0;
+    std::string job_state;
+    // These reason strings are defined in the PWG standard. There are other
+    // values possible, but for now, just use a typical value.
+    std::string reason;
+    switch (info.state) {
+      case kPending:
+        images_completed = 1;
+        images_to_transfer = 1;
+        job_state = "Pending";
+        reason = "JobScanning";
+        break;
+      case kCanceled:
+        images_completed = 0;
+        images_to_transfer = 0;
+        job_state = "Canceled";
+        reason = "JobTimedOut";
+        break;
+      case kCompleted:
+        images_completed = 1;
+        images_to_transfer = 0;
+        job_state = "Completed";
+        reason = "JobCompletedSuccessfully";
+        break;
+    }
+
+    AddNodeWithContent(job_info, pwg, "ImagesCompleted",
+                       std::to_string(images_completed));
+    AddNodeWithContent(job_info, pwg, "ImagesToTransfer",
+                       std::to_string(images_to_transfer));
+    AddNodeWithContent(job_info, pwg, "JobState", job_state);
+    xmlNode* job_state_reasons = AddNode(job_info, pwg, "JobStateReasons");
+    AddNodeWithContent(job_state_reasons, pwg, "JobStateReason", reason);
+  }
+
+  return root;
+}
+
 }  // namespace
 
 std::vector<uint8_t> ScannerCapabilitiesAsXml(const ScannerCapabilities& caps) {
@@ -161,6 +222,13 @@ std::vector<uint8_t> ScannerStatusAsXml(const ScannerStatus& status) {
 
   AddNodeWithContent(root.get(), pwg, "Version", "2.6.3");
   AddNodeWithContent(root.get(), pwg, "State", status.idle ? "Idle" : "Busy");
+
+  // Add a list of all of the scan jobs
+  namespace_map namespaces;
+  namespaces[kPwgNs] = pwg;
+  namespaces[kScanNs] = scan;
+  UniqueXmlNodePtr jobs = JobListAsXml(status.jobs, &namespaces);
+  xmlAddChild(root.get(), jobs.release());
 
   return Serialize(std::move(root));
 }
