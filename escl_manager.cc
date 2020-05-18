@@ -6,7 +6,11 @@
 
 #include <utility>
 
+#include <base/files/file_util.h>
 #include <base/logging.h>
+#include <base/strings/string_split.h>
+#include <base/strings/string_util.h>
+#include <crypto/random.h>
 
 #include "xml_util.h"
 
@@ -85,6 +89,46 @@ base::Optional<SourceCapabilities> CreateSourceCapabilitiesFromConfig(
   return result;
 }
 
+// Generates a hyphenated UUID v4 (random).
+// An example UUID looks like "0b2cdf31-edee-4246-a1ad-07bbe754856b"
+std::string GenerateUUID() {
+  // We only need 16 bytes of randomness, not 32, but using 32 makes the rest of
+  // the code a little clearer.
+  std::vector<uint8_t> bytes(32);
+  crypto::RandBytes(bytes.data(), bytes.size());
+
+  std::string uuid;
+  for (int i = 0; i < 32; i++) {
+    if (i == 8 || i == 12 || i == 16 || i == 20)
+      uuid += "-";
+
+    uint8_t val = bytes[i] % 16;
+    if (i == 12) {
+      val = 4;
+    } else if (i == 16) {
+      val &= ~0x4;
+      val |= 0x8;
+    }
+
+    if (0 <= val && val <= 9)
+      uuid += '0' + val;
+    else
+      uuid += 'a' + (val - 10);
+  }
+  return uuid;
+}
+
+std::string JobStateAsString(JobState state) {
+  switch (state) {
+    case kCanceled:
+      return "Canceled";
+    case kCompleted:
+      return "Completed";
+    case kPending:
+      return "Pending";
+  }
+}
+
 }  // namespace
 
 base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
@@ -127,10 +171,13 @@ base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
   return result;
 }
 
-EsclManager::EsclManager(ScannerCapabilities scanner_capabilities)
-    : scanner_capabilities_(std::move(scanner_capabilities)) {}
+EsclManager::EsclManager(ScannerCapabilities scanner_capabilities,
+                         const base::FilePath& document_path)
+    : scanner_capabilities_(std::move(scanner_capabilities)),
+      document_path_(document_path) {}
 
-HttpResponse EsclManager::HandleEsclRequest(const HttpRequest& request) const {
+HttpResponse EsclManager::HandleEsclRequest(const HttpRequest& request,
+                                            const SmartBuffer& request_body) {
   if (request.method == "GET" && request.uri == "/eSCL/ScannerCapabilities") {
     HttpResponse response;
     response.status = "200 OK";
@@ -143,8 +190,16 @@ HttpResponse EsclManager::HandleEsclRequest(const HttpRequest& request) const {
     response.headers["Content-Type"] = "text/xml";
     response.body.Add(ScannerStatusAsXml(status_));
     return response;
+  } else if (request.method == "POST" && request.uri == "/eSCL/ScanJobs") {
+    return HandleCreateScanJob(request_body);
+  } else if (request.method == "GET" &&
+             base::StartsWith(request.uri, "/eSCL/ScanJobs/",
+                              base::CompareCase::SENSITIVE)) {
+    return HandleGetNextDocument(request.uri);
   } else if (request.uri == "/eSCL/ScannerCapabilities" ||
-             request.uri == "/eSCL/ScannerStatus") {
+             request.uri == "/eSCL/ScannerStatus" ||
+             base::StartsWith(request.uri, "/eSCL/ScanJobs",
+                              base::CompareCase::SENSITIVE)) {
     LOG(ERROR) << "Unexpected request method " << request.method
                << " for endpoint " << request.uri;
     HttpResponse response;
@@ -157,4 +212,73 @@ HttpResponse EsclManager::HandleEsclRequest(const HttpRequest& request) const {
     response.status = "404 Not Found";
     return response;
   }
+}
+
+// Generates an HTTP response for a POST request to the /eSCL/ScanJobs endpoint.
+HttpResponse EsclManager::HandleCreateScanJob(const SmartBuffer& request_body) {
+  HttpResponse response;
+
+  base::Optional<ScanSettings> settings =
+      ScanSettingsFromXml(request_body.contents());
+  if (!settings) {
+    LOG(ERROR) << "Could not parse ScanSettings from request body";
+    response.status = "415 Unsupported Media Type";
+    return response;
+  }
+  std::string uuid = GenerateUUID();
+  JobInfo job;
+  job.created = base::TimeTicks::Now();
+  job.state = kPending;
+  status_.jobs[uuid] = job;
+
+  response.status = "201 Created";
+  response.headers["Location"] = "/eSCL/ScanJobs/" + uuid;
+  response.headers["Pragma"] = "no-cache";
+  return response;
+}
+
+// Generates an HTTP response containing scan data for a previously created
+// scan job.
+// The URI should be formatted as:
+//   "/eSCL/ScanJobs/0b2cdf31-edee-4246-a1ad-07bbe754856b/NextDocument"
+HttpResponse EsclManager::HandleGetNextDocument(const std::string& uri) {
+  HttpResponse response;
+  std::vector<std::string> tokens =
+      base::SplitString(uri, "/", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
+  if (tokens.size() != 5 || tokens[4] != "NextDocument") {
+    LOG(ERROR) << "Malformed ScanJobs request URI: " << uri;
+    response.status = "405 Method Not Allowed";
+    return response;
+  }
+
+  std::string uuid = tokens[3];
+  if (status_.jobs.count(uuid) == 0) {
+    LOG(ERROR) << "No job found with uuid: " << uuid;
+    response.status = "404 Not Found";
+    return response;
+  }
+
+  JobInfo info = status_.jobs[uuid];
+  switch (info.state) {
+    case kCanceled:
+    case kCompleted:
+      LOG(INFO) << "Not providing NextDocument for "
+                << JobStateAsString(info.state) << " job.";
+      response.status = "404 Not Found";
+      break;
+    case kPending: {
+      status_.jobs[uuid].state = kCompleted;
+      std::string document;
+      if (!base::ReadFileToString(document_path_, &document)) {
+        LOG(ERROR) << "Failed to read document at " << document_path_
+                   << ", sending empty response";
+      }
+      response.status = "200 OK";
+      response.headers["Content-Type"] = "image/jpeg";
+      response.body.Add(document);
+      break;
+    }
+  }
+
+  return response;
 }

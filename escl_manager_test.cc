@@ -236,8 +236,8 @@ TEST(HandleEsclRequest, InvalidEndpoint) {
   request.uri = "/eSCL/InvalidEndpoint";
 
   ScannerCapabilities caps;
-  EsclManager manager(caps);
-  HttpResponse response = manager.HandleEsclRequest(request);
+  EsclManager manager(caps, base::FilePath());
+  HttpResponse response = manager.HandleEsclRequest(request, SmartBuffer());
   EXPECT_EQ(response.status, "404 Not Found");
   EXPECT_EQ(response.body.size(), 0);
 }
@@ -253,8 +253,8 @@ TEST(HandleEsclRequest, ScannerCapabilities) {
   base::Optional<ScannerCapabilities> caps =
       CreateScannerCapabilitiesFromConfig(CreateCapabilitiesJson());
   ASSERT_TRUE(caps);
-  EsclManager manager(caps.value());
-  HttpResponse response = manager.HandleEsclRequest(request);
+  EsclManager manager(caps.value(), base::FilePath());
+  HttpResponse response = manager.HandleEsclRequest(request, SmartBuffer());
   EXPECT_EQ(response.status, "200 OK");
   EXPECT_GT(response.body.size(), 0);
 
@@ -274,8 +274,8 @@ TEST(HandleEsclRequest, ScannerStatus) {
   request.uri = "/eSCL/ScannerStatus";
 
   ScannerCapabilities caps;
-  EsclManager manager(caps);
-  HttpResponse response = manager.HandleEsclRequest(request);
+  EsclManager manager(caps, base::FilePath());
+  HttpResponse response = manager.HandleEsclRequest(request, SmartBuffer());
   EXPECT_EQ(response.status, "200 OK");
   EXPECT_GT(response.body.size(), 0);
 
@@ -284,4 +284,18 @@ TEST(HandleEsclRequest, ScannerStatus) {
                     response.body.size(), "noname.xml", NULL, 0);
   EXPECT_NE(doc, nullptr);
   xmlFreeDoc(doc);
+}
+
+TEST(HandleEsclRequest, ScanJobs) {
+  HttpRequest request;
+  request.method = "POST";
+  request.uri = "/eSCL/ScanJobs";
+
+  ScannerCapabilities caps;
+  EsclManager manager(caps, base::FilePath());
+  std::vector<uint8_t> xml(kNewScan, kNewScan + strlen(kNewScan));
+  SmartBuffer body(xml);
+
+  HttpResponse response = manager.HandleEsclRequest(request, body);
+  EXPECT_EQ(response.status, "201 Created");
 }

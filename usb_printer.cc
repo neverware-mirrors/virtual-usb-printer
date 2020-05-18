@@ -321,7 +321,7 @@ HttpResponse UsbPrinter::GenerateHttpResponse(const HttpRequest& request,
     response.body = ipp_manager_.HandleIppRequest(ipp_header.value(), *body);
   } else if (base::StartsWith(request.uri, "/eSCL",
                               base::CompareCase::SENSITIVE)) {
-    response = escl_manager_.HandleEsclRequest(request);
+    response = escl_manager_.HandleEsclRequest(request, *body);
   } else {
     LOG(ERROR) << "Invalid method '" << request.method << "' and/or endpoint '"
                << request.uri << "'";

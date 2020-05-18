@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <base/containers/flat_map.h>
+#include <base/files/file_path.h>
 #include <base/optional.h>
 #include <base/time/time.h>
 #include <base/values.h>
@@ -112,19 +113,27 @@ struct ScannerStatus {
 
 // This class is responsible for generating responses to eSCL requests sent
 // over USB.
+// The |document_path| parameter specifies the path to the scan data that
+// should be reported to clients within HandleGetNextDocument.
 class EsclManager {
  public:
   EsclManager() = default;
-  explicit EsclManager(ScannerCapabilities scanner_capabilities);
+  EsclManager(ScannerCapabilities scanner_capabilities,
+              const base::FilePath& document_path);
 
-  // Generates an HTTP response for the given HttpRequest.
+  // Generates an HTTP response for the given HttpRequest and request body.
   // If |request| is not a valid eSCL request (for example, invalid endpoint
   // or request method), the response will be an error response.
-  HttpResponse HandleEsclRequest(const HttpRequest& request) const;
+  HttpResponse HandleEsclRequest(const HttpRequest& request,
+                                 const SmartBuffer& request_body);
 
  private:
+  HttpResponse HandleCreateScanJob(const SmartBuffer& request_body);
+  HttpResponse HandleGetNextDocument(const std::string& uri);
+
   ScannerCapabilities scanner_capabilities_;
   ScannerStatus status_;
+  base::FilePath document_path_;
 };
 
 #endif  // __ESCL_MANAGER_H__

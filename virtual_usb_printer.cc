@@ -34,7 +34,8 @@ constexpr char kUsage[] =
     "    --descriptors_path=<path>\n"
     "    [--record_doc_path=<path>]\n"
     "    [--attributes_path=<path>]\n"
-    "    [--scanner_capabilities_path=<path>]";
+    "    [--scanner_capabilities_path=<path>]"
+    "    [--scanner_doc_path=<path>]";
 
 // Create a new UsbDescriptors object using the USB descriptors defined in
 // |printer_config|.
@@ -60,7 +61,7 @@ UsbDescriptors CreateUsbDescriptors(
 // Parses |capabilities_path| into a JSON object in order to do so, returning
 // nullopt if that parsing fails.
 base::Optional<EsclManager> InitializeEsclManager(
-    const std::string& capabilities_path) {
+    const std::string& capabilities_path, const std::string& scanner_doc_path) {
   if (capabilities_path.empty()) {
     return EsclManager();
   }
@@ -87,7 +88,8 @@ base::Optional<EsclManager> InitializeEsclManager(
     return base::nullopt;
   }
 
-  return EsclManager(std::move(capabilities.value()));
+  base::FilePath document_path(scanner_doc_path);
+  return EsclManager(std::move(capabilities.value()), document_path);
 }
 
 }  // namespace
@@ -98,6 +100,8 @@ int main(int argc, char* argv[]) {
   DEFINE_string(attributes_path, "", "Path to IPP attributes JSON file");
   DEFINE_string(scanner_capabilities_path, "",
                 "Path to eSCL ScannerCapabilities JSON file");
+  DEFINE_string(scanner_doc_path, "",
+                "Path to file containing data to return from scan jobs");
 
   brillo::FlagHelper::Init(argc, argv, "Virtual USB Printer");
   brillo::InitLog(brillo::kLogToSyslog | brillo::kLogToStderrIfTty);
@@ -165,8 +169,8 @@ int main(int argc, char* argv[]) {
                    unsupported_attributes, document_output_path);
   }
 
-  base::Optional<EsclManager> escl_manager =
-      InitializeEsclManager(FLAGS_scanner_capabilities_path);
+  base::Optional<EsclManager> escl_manager = InitializeEsclManager(
+      FLAGS_scanner_capabilities_path, FLAGS_scanner_doc_path);
   if (!escl_manager.has_value())
     return 1;
 
