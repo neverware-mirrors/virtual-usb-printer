@@ -8,8 +8,11 @@
 #include <utility>
 #include <string>
 
-#include <base/containers/flat_map.h>
 #include <libxml/tree.h>
+
+#include <base/containers/flat_map.h>
+#include <base/strings/string_number_conversions.h>
+#include <base/strings/string_util.h>
 
 namespace {
 
@@ -29,6 +32,31 @@ using namespace_map = base::flat_map<std::string, xmlNs*>;
 
 inline const xmlChar* XmlCast(const char* p) {
   return reinterpret_cast<const xmlChar*>(p);
+}
+
+bool StrEqual(const xmlChar* first, const char* second) {
+  return xmlStrEqual(first, XmlCast(second));
+}
+
+base::Optional<std::string> GetContent(const xmlNode* node) {
+  if (!node || !node->children) {
+    LOG(ERROR) << "node does not have content";
+    return base::nullopt;
+  }
+  return reinterpret_cast<const char*>(node->children->content);
+}
+
+// Attempt to parse the contents of |node| as an integer.
+base::Optional<int> GetIntContent(const xmlNode* node) {
+  base::Optional<std::string> contents = GetContent(node);
+  if (!contents)
+    return base::nullopt;
+  int value;
+  if (!base::StringToInt(contents.value(), &value)) {
+    LOG(ERROR) << "Failed to convert " << contents.value() << " to int";
+    return base::nullopt;
+  }
+  return value;
 }
 
 // Serialize the xml tree in |root| into a vector. Consumes |root| and frees
@@ -176,6 +204,69 @@ UniqueXmlNodePtr JobListAsXml(const base::flat_map<std::string, JobInfo>& jobs,
   return root;
 }
 
+base::Optional<ScanRegion> ScanRegionFromNode(const xmlNode* node) {
+  if (!node) {
+    LOG(ERROR) << "ScanRegion node cannot be null";
+    return base::nullopt;
+  }
+
+  ScanRegion region;
+  // node->children is a null-terminated doubly-linked list of nodes. We
+  // iterate over the '->next' pointers, stopping once we get a null value.
+  for (xmlNode* child = node->children; child; child = child->next) {
+    if (StrEqual(child->name, "ContentRegionUnits")) {
+      base::Optional<std::string> content = GetContent(child);
+      if (!content) {
+        LOG(ERROR) << "ContentRegionUnits node is empty";
+        return base::nullopt;
+      }
+      region.units = content.value();
+    } else if (StrEqual(child->name, "Height")) {
+      base::Optional<int> content = GetIntContent(child);
+      if (!content) {
+        LOG(ERROR) << "Height node does not have valid contents";
+        return base::nullopt;
+      }
+      region.height = content.value();
+    } else if (StrEqual(child->name, "Width")) {
+      base::Optional<int> content = GetIntContent(child);
+      if (!content) {
+        LOG(ERROR) << "Width node does not have valid contents";
+        return base::nullopt;
+      }
+      region.width = content.value();
+    } else if (StrEqual(child->name, "XOffset")) {
+      base::Optional<int> content = GetIntContent(child);
+      if (!content) {
+        LOG(ERROR) << "XOffset node does not have valid contents";
+        return base::nullopt;
+      }
+      region.x_offset = content.value();
+    } else if (StrEqual(child->name, "YOffset")) {
+      base::Optional<int> content = GetIntContent(child);
+      if (!content) {
+        LOG(ERROR) << "YOffset node does not have valid contents";
+        return base::nullopt;
+      }
+      region.y_offset = content.value();
+    }
+  }
+
+  return region;
+}
+
+base::Optional<ColorMode> ColorModeFromString(const std::string& color_mode) {
+  if (color_mode == "RGB24") {
+    return kRGB;
+  } else if (color_mode == "Grayscale8") {
+    return kGrayscale;
+  } else if (color_mode == "BlackAndWhite1") {
+    return kBlackAndWhite;
+  } else {
+    return base::nullopt;
+  }
+}
+
 }  // namespace
 
 std::vector<uint8_t> ScannerCapabilitiesAsXml(const ScannerCapabilities& caps) {
@@ -231,4 +322,87 @@ std::vector<uint8_t> ScannerStatusAsXml(const ScannerStatus& status) {
   xmlAddChild(root.get(), jobs.release());
 
   return Serialize(std::move(root));
+}
+
+base::Optional<ScanSettings> ScanSettingsFromXml(
+    const std::vector<uint8_t>& xml) {
+  // Since this document doesn't have a url, we use a filler value.
+  const char* url = "noname.xml";
+  // We don't know the encoding, so pass NULL to autodetect.
+  const char* encoding = NULL;
+  const UniqueXmlDocPtr doc(
+      xmlReadMemory(reinterpret_cast<const char*>(xml.data()), xml.size(), url,
+                    encoding, /*options=*/0));
+  if (!doc) {
+    LOG(ERROR) << "Could not parse data as XML document";
+    return base::nullopt;
+  }
+
+  const xmlNode* root = xmlDocGetRootElement(doc.get());
+  if (!root) {
+    LOG(ERROR) << "XML document does not have root node";
+    return base::nullopt;
+  }
+
+  ScanSettings settings;
+  // Iterate over doubly-linked list of nodes in the document.
+  for (const xmlNode* node = root->children; node; node = node->next) {
+    if (StrEqual(node->name, "ScanRegions")) {
+      // Iterate over doubly-linked list of children of the ScanRegions node.
+      for (xmlNode* child = node->children; child; child = child->next) {
+        if (StrEqual(child->name, "ScanRegion")) {
+          base::Optional<ScanRegion> region = ScanRegionFromNode(child);
+          if (!region) {
+            LOG(ERROR) << "Failed to parse ScanRegion";
+            return base::nullopt;
+          }
+          settings.regions.push_back(region.value());
+        }
+      }
+    } else if (StrEqual(node->name, "DocumentFormat")) {
+      base::Optional<std::string> format = GetContent(node);
+      if (!format) {
+        LOG(ERROR) << "DocumentFormat node does not have valid contents.";
+        return base::nullopt;
+      }
+      settings.document_format = format.value();
+    } else if (StrEqual(node->name, "ColorMode")) {
+      base::Optional<std::string> color_mode_string = GetContent(node);
+      if (!color_mode_string) {
+        LOG(ERROR) << "ColorMode node does not have valid contents.";
+        return base::nullopt;
+      }
+
+      base::Optional<ColorMode> color_mode =
+          ColorModeFromString(color_mode_string.value());
+      if (!color_mode) {
+        LOG(ERROR) << "Invalid ColorMode value: " << color_mode_string.value();
+        return base::nullopt;
+      }
+      settings.color_mode = color_mode.value();
+    } else if (StrEqual(node->name, "InputSource")) {
+      base::Optional<std::string> source = GetContent(node);
+      if (!source) {
+        LOG(ERROR) << "InputSource node does not have valid contents.";
+        return base::nullopt;
+      }
+      settings.input_source = source.value();
+    } else if (StrEqual(node->name, "XResolution")) {
+      base::Optional<int> resolution = GetIntContent(node);
+      if (!resolution) {
+        LOG(ERROR) << "XResolution node does not have valid contents.";
+        return base::nullopt;
+      }
+      settings.x_resolution = resolution.value();
+    } else if (StrEqual(node->name, "YResolution")) {
+      base::Optional<int> resolution = GetIntContent(node);
+      if (!resolution) {
+        LOG(ERROR) << "YResolution node does not have valid contents.";
+        return base::nullopt;
+      }
+      settings.y_resolution = resolution.value();
+    }
+  }
+
+  return settings;
 }

@@ -21,6 +21,35 @@ using ::testing::ElementsAre;
 
 namespace {
 
+// An eSCL ScanSettings structure serialized to XML. This is used to test our
+// XML parsing code, as well as to test handling of requests to the ScanJob
+// endpoint that wish to create new scans.
+// clang-format off
+constexpr char kNewScan[] =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+    "<scan:ScanSettings xmlns:pwg=\"http://www.pwg.org/schemas/2010/12/sm\" "
+         "xmlns:scan=\"http://schemas.hp.com/imaging/escl/2011/05/03\">"
+       "<pwg:Version>2.0</pwg:Version>"
+       "<pwg:ScanRegions>"
+           "<pwg:ScanRegion>"
+               "<pwg:ContentRegionUnits>"
+                   "escl:ThreeHundredthsOfInches"
+               "</pwg:ContentRegionUnits>"
+               "<pwg:Height>600</pwg:Height>"
+               "<pwg:Width>200</pwg:Width>"
+               "<pwg:XOffset>0</pwg:XOffset>"
+               "<pwg:YOffset>0</pwg:YOffset>"
+           "</pwg:ScanRegion>"
+       "</pwg:ScanRegions>"
+       "<pwg:DocumentFormat>png</pwg:DocumentFormat>"
+       "<scan:ColorMode>BlackAndWhite1</scan:ColorMode>"
+       "<scan:XResolution>300</scan:XResolution>"
+       "<scan:YResolution>300</scan:YResolution>"
+       "<pwg:InputSource>Platen</pwg:InputSource>"
+       "<scan:InputSource>Platen</scan:InputSource>"
+   "</scan:ScanSettings>";
+// clang-format on
+
 Value CreateCapabilitiesJson() {
   Value dict(Value::Type::DICTIONARY);
   dict.SetKey("MakeAndModel", Value("Test Make and Model"));
@@ -178,6 +207,27 @@ TEST(ScannerCapabilities, AsXml) {
                           "scan:DiscreteResolution/scan:XResolution",
                       {"100", "200", "300"});
   xmlFreeDoc(doc);
+}
+
+// Test that we can properly parse a ScanSettings document.
+TEST(ScanSettings, Parse) {
+  std::vector<uint8_t> xml(kNewScan, kNewScan + strlen(kNewScan));
+  base::Optional<ScanSettings> opt_settings = ScanSettingsFromXml(xml);
+  EXPECT_TRUE(opt_settings);
+  ScanSettings settings = opt_settings.value();
+  EXPECT_EQ(settings.document_format, "png");
+  EXPECT_EQ(settings.color_mode, kBlackAndWhite);
+  EXPECT_EQ(settings.input_source, "Platen");
+  EXPECT_EQ(settings.x_resolution, 300);
+  EXPECT_EQ(settings.y_resolution, 300);
+
+  EXPECT_EQ(settings.regions.size(), 1);
+  ScanRegion region = settings.regions.at(0);
+  EXPECT_EQ(region.units, "escl:ThreeHundredthsOfInches");
+  EXPECT_EQ(region.height, 600);
+  EXPECT_EQ(region.width, 200);
+  EXPECT_EQ(region.x_offset, 0);
+  EXPECT_EQ(region.y_offset, 0);
 }
 
 TEST(HandleEsclRequest, InvalidEndpoint) {

@@ -31,6 +31,59 @@ struct ScannerCapabilities {
 base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
     const base::Value& config);
 
+// A particular region of a document to return in a scan.
+struct ScanRegion {
+  // The units that the other values in the struct are measured in. Some
+  // permitted values: "Micrometers", "Pixels", "TenThousandthsOfInches",
+  // "Percent", "Other", "Unknown", and anything matching the regex
+  // "\w+:[\w_\=\.]+".
+  // See also:
+  // http://www.pwg.org/mfd/navigate/PwgSmRev1-185_ContentRegionUnitsType.html
+  std::string units;
+  int height;
+  int width;
+  int x_offset;
+  int y_offset;
+};
+
+// What color setting to use for an incoming scan.
+enum ColorMode {
+  // 1 bit black and white.
+  kBlackAndWhite,
+
+  // 8 bit grayscale.
+  kGrayscale,
+
+  // 24 bit color.
+  kRGB,
+};
+
+// The information contained in a request to create a new scan job.
+// This is parsed from incoming requests to the ScanJobs endpoint.
+struct ScanSettings {
+  // The format to return the scan data in, for example 'image/jpeg',
+  // 'image/tiff, etc.
+  // See also
+  // http://www.pwg.org/mfd/navigatePJT/PwgPrintJobTicket_v1.0_DocumentFormatType.html
+  std::string document_format;
+
+  ColorMode color_mode;
+
+  // The source from which to read the scan data, for example 'Platen', 'ADF',
+  // 'FilmReader'.
+  // See also
+  // http://www.pwg.org/mfd/navigatePJT/PwgPrintJobTicket_v1.0_InputSourceType.html
+  std::string input_source;
+
+  // Frequently the X and Y resolution are the same.
+  int x_resolution;
+  int y_resolution;
+
+  // All of the regions of the document that we want to scan. Most often,
+  // there is only one of these.
+  std::vector<ScanRegion> regions;
+};
+
 // The possible states for a scan job.
 enum JobState {
   // The job was cancelled before it could be completed.

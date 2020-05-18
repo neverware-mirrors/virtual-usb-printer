@@ -9,6 +9,8 @@
 
 #include <vector>
 
+#include <base/optional.h>
+
 #include "escl_manager.h"
 
 // Returns a serialized eSCL ScannerCapabilities XML representation of |caps|.
@@ -18,5 +20,9 @@ std::vector<uint8_t> ScannerCapabilitiesAsXml(const ScannerCapabilities& caps);
 
 // Returns a serialized eSCL ScannerStatus XML representation of |status|.
 std::vector<uint8_t> ScannerStatusAsXml(const ScannerStatus& status);
+
+// Attempts to parse a ScanSettings object from its xml representation, |xml|.
+base::Optional<ScanSettings> ScanSettingsFromXml(
+    const std::vector<uint8_t>& xml);
 
 #endif  // __XML_UTIL_H__
