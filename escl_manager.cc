@@ -196,6 +196,10 @@ HttpResponse EsclManager::HandleEsclRequest(const HttpRequest& request,
              base::StartsWith(request.uri, "/eSCL/ScanJobs/",
                               base::CompareCase::SENSITIVE)) {
     return HandleGetNextDocument(request.uri);
+  } else if (request.method == "DELETE" &&
+             base::StartsWith(request.uri, "/eSCL/ScanJobs/",
+                              base::CompareCase::SENSITIVE)) {
+    return HandleDeleteJob(request.uri);
   } else if (request.uri == "/eSCL/ScannerCapabilities" ||
              request.uri == "/eSCL/ScannerStatus" ||
              base::StartsWith(request.uri, "/eSCL/ScanJobs",
@@ -246,7 +250,7 @@ HttpResponse EsclManager::HandleGetNextDocument(const std::string& uri) {
   std::vector<std::string> tokens =
       base::SplitString(uri, "/", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
   if (tokens.size() != 5 || tokens[4] != "NextDocument") {
-    LOG(ERROR) << "Malformed ScanJobs request URI: " << uri;
+    LOG(ERROR) << "Malformed GET ScanJobs request URI: " << uri;
     response.status = "405 Method Not Allowed";
     return response;
   }
@@ -280,5 +284,26 @@ HttpResponse EsclManager::HandleGetNextDocument(const std::string& uri) {
     }
   }
 
+  return response;
+}
+
+// Generates an HTTP response to a request to delete the ScanJob at |uri|.
+HttpResponse EsclManager::HandleDeleteJob(const std::string& uri) {
+  HttpResponse response;
+  std::vector<std::string> tokens =
+      base::SplitString(uri, "/", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
+  if (tokens.size() != 4) {
+    LOG(ERROR) << "Malformed DELETE ScanJobs request URI: " << uri;
+    response.status = "405 Method Not Allowed";
+    return response;
+  }
+
+  std::string uuid = tokens[3];
+  size_t erased = status_.jobs.erase(uuid);
+  if (erased == 1) {
+    response.status = "200 OK";
+  } else {
+    response.status = "404 Not Found";
+  }
   return response;
 }

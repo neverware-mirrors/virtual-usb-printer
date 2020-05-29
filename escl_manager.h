@@ -130,6 +130,7 @@ class EsclManager {
  private:
   HttpResponse HandleCreateScanJob(const SmartBuffer& request_body);
   HttpResponse HandleGetNextDocument(const std::string& uri);
+  HttpResponse HandleDeleteJob(const std::string& uri);
 
   ScannerCapabilities scanner_capabilities_;
   ScannerStatus status_;

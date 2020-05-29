@@ -299,3 +299,39 @@ TEST(HandleEsclRequest, ScanJobs) {
   HttpResponse response = manager.HandleEsclRequest(request, body);
   EXPECT_EQ(response.status, "201 Created");
 }
+
+TEST(HandleEsclRequest, DeleteExistingScanJob) {
+  HttpRequest request;
+  request.method = "POST";
+  request.uri = "/eSCL/ScanJobs";
+
+  ScannerCapabilities caps;
+  EsclManager manager(caps, base::FilePath());
+  std::vector<uint8_t> xml(kNewScan, kNewScan + strlen(kNewScan));
+  SmartBuffer body(xml);
+
+  HttpResponse response = manager.HandleEsclRequest(request, body);
+  EXPECT_EQ(response.status, "201 Created");
+  ASSERT_EQ(response.headers.count("Location"), 1);
+  request.uri = response.headers["Location"];
+  request.method = "DELETE";
+
+  // Deleting the just created resource should succeed.
+  response = manager.HandleEsclRequest(request, SmartBuffer());
+  EXPECT_EQ(response.status, "200 OK");
+
+  // Deleting the same resource a second time should return Not Found.
+  response = manager.HandleEsclRequest(request, SmartBuffer());
+  EXPECT_EQ(response.status, "404 Not Found");
+}
+
+TEST(HandleEsclRequest, DeleteNonexistentScanJob) {
+  HttpRequest request;
+  request.method = "DELETE";
+  request.uri = "/eSCL/ScanJobs/0b2cdf31-edee-4246-a1ad-07bbe754856b";
+
+  ScannerCapabilities caps;
+  EsclManager manager(caps, base::FilePath());
+  HttpResponse response = manager.HandleEsclRequest(request, SmartBuffer());
+  EXPECT_EQ(response.status, "404 Not Found");
+}
