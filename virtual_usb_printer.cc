@@ -72,8 +72,9 @@ base::Optional<EsclManager> InitializeEsclManager(
     return base::nullopt;
   }
 
+  // TODO(crbug/1054279): Use new Read API after libchrome uprev.
   std::unique_ptr<base::Value> capabilities_json =
-      base::JSONReader::Read(capabilities_string);
+      base::JSONReader::ReadDeprecated(capabilities_string);
   if (!capabilities_json) {
     LOG(ERROR) << "Failed to parse capabilities as JSON";
     return base::nullopt;
