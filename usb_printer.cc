@@ -85,10 +85,6 @@ bool InterfaceManager::QueueEmpty() const {
   return queue_.empty();
 }
 
-void InterfaceManager::ChunkedMessageAdd(const SmartBuffer& message) {
-  chunked_message_.Add(message);
-}
-
 SmartBuffer InterfaceManager::PopMessage() {
   CHECK(!QueueEmpty()) << "Can't pop message from empty queue.";
   auto message = queue_.front();
@@ -198,45 +194,50 @@ void UsbPrinter::HandleIppUsbData(int sockfd,
   // Acknowledge receipt of BULK transfer.
   SendUsbDataResponse(sockfd, usb_request, received);
 
-  InterfaceManager* im = GetInterfaceManager(usb_request.header.ep);
-  if (im->receiving_chunked()) {
-    HandleChunkedIppUsbData(usb_request, &message);
-    return;
-  }
-
-  base::Optional<HttpRequest> opt_request = HttpRequest::Deserialize(&message);
-  if (!opt_request.has_value()) {
-    LOG(ERROR) << "Incoming message is not valid HTTP; ignoring";
-    return;
-  }
-
-  HttpRequest request = opt_request.value();
-  if (request.IsChunkedMessage()) {
-    im->set_receiving_chunked(true);
-    im->set_chunked_request(request);
-    HandleChunkedIppUsbData(usb_request, &message);
-    return;
-  }
-
-  HttpResponse response = GenerateHttpResponse(request, &message);
-  QueueHttpResponse(usb_request, response);
+  HandleHttpData(usb_request, &message);
 }
 
-void UsbPrinter::HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
-                                         SmartBuffer* message) {
+void UsbPrinter::HandleHttpData(const UsbipCmdSubmit& usb_request,
+                                SmartBuffer* message) {
   InterfaceManager* im = GetInterfaceManager(usb_request.header.ep);
 
-  bool complete = ContainsFinalChunk(*message);
-  im->set_receiving_chunked(!complete);
-  im->ChunkedMessageAdd(*message);
+  if (!im->receiving_message()) {
+    // If we're not currently receiving, |message| must be the start of a new
+    // HTTP message. Parse the header and setup some fields to track state.
+    base::Optional<HttpRequest> opt_request = HttpRequest::Deserialize(message);
+    if (!opt_request.has_value()) {
+      LOG(ERROR) << "Incoming message is not valid HTTP; ignoring";
+      return;
+    }
+    HttpRequest request = opt_request.value();
+    im->set_receiving_message(true);
+    im->set_request_header(request);
+    im->set_receiving_chunked(request.IsChunkedMessage());
+  }
+
+  im->message()->Add(*message);
+  bool complete = false;
+  if (im->receiving_chunked()) {
+    complete = ContainsFinalChunk(*message);
+  } else {
+    complete = im->message()->size() == im->request_header().ContentLength();
+  }
 
   if (complete) {
-    // The final chunk has been received.
-    SmartBuffer* chunks = im->chunked_message();
-    // Assemble the chunks into the HTTP request body
-    SmartBuffer payload = MergeDocument(chunks);
+    SmartBuffer* complete_message = im->message();
+
+    SmartBuffer payload;
+    if (im->receiving_chunked()) {
+      // Assemble the chunks into the HTTP request body
+      payload = MergeDocument(complete_message);
+    } else {
+      payload = *complete_message;
+      complete_message->Erase(0, complete_message->size());
+    }
+
+    im->set_receiving_message(false);
     HttpResponse response =
-        GenerateHttpResponse(im->chunked_request(), &payload);
+        GenerateHttpResponse(im->request_header(), &payload);
     QueueHttpResponse(usb_request, response);
   }
 }

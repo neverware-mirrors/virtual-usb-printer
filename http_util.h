@@ -24,6 +24,11 @@ class HttpRequest {
   // transfer encoding.
   bool IsChunkedMessage() const;
 
+  // Return the value of the Content-Length header.
+  // If there is no Content-Length header, returns 0 (as implicitly, the
+  // length of the request body will be 0).
+  size_t ContentLength() const;
+
   std::string method;
   std::string uri;
   HttpHeaders headers;

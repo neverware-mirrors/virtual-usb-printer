@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <vector>
 
+#include <base/strings/string_number_conversions.h>
 #include <base/strings/string_split.h>
 #include <base/strings/string_util.h>
 
@@ -115,6 +116,21 @@ base::Optional<HttpRequest> HttpRequest::Deserialize(SmartBuffer* message) {
   // Erase the data we just parsed from |message|.
   message->Erase(0, request_end + kHttpRequestEnd.size());
   return request;
+}
+
+size_t HttpRequest::ContentLength() const {
+  const auto content_length = headers.find("Content-Length");
+  if (content_length == headers.end())
+    return 0;
+
+  size_t length;
+  if (!base::StringToSizeT(content_length->second, &length)) {
+    LOG(ERROR) << "Could not convert Content-Length header to integer: "
+               << content_length->second;
+    return 0;
+  }
+
+  return length;
 }
 
 bool HttpRequest::IsChunkedMessage() const {

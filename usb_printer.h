@@ -38,24 +38,26 @@ class InterfaceManager {
   // is called when |queue_| is empty then the program will exit.
   SmartBuffer PopMessage();
 
+  bool receiving_message() const { return receiving_message_; }
+  void set_receiving_message(bool b) { receiving_message_ = b; }
+
   bool receiving_chunked() const { return receiving_chunked_; }
   void set_receiving_chunked(bool b) { receiving_chunked_ = b; }
 
-  HttpRequest chunked_request() const { return chunked_request_; }
-  void set_chunked_request(const HttpRequest& r) { chunked_request_ = r; }
+  HttpRequest request_header() const { return request_header_; }
+  void set_request_header(const HttpRequest& r) { request_header_ = r; }
 
-  SmartBuffer* chunked_message() {
-    return &chunked_message_;
-  }
-  void ChunkedMessageAdd(const SmartBuffer& message);
+  SmartBuffer* message() { return &message_; }
 
  private:
   std::queue<SmartBuffer> queue_;
+  // Represents whether the interface is currently receiving an HTTP message.
+  bool receiving_message_;
   // Represents whether the interface is currently receiving an HTTP "chunked"
   // message.
   bool receiving_chunked_;
-  HttpRequest chunked_request_;
-  SmartBuffer chunked_message_;
+  HttpRequest request_header_;
+  SmartBuffer message_;
 };
 
 // A grouping of the descriptors for a USB device.
@@ -180,8 +182,7 @@ class UsbPrinter {
 
   void HandleIppUsbData(int sockfd, const UsbipCmdSubmit& usb_request);
 
-  void HandleChunkedIppUsbData(const UsbipCmdSubmit& usb_request,
-                               SmartBuffer* message);
+  void HandleHttpData(const UsbipCmdSubmit& usb_request, SmartBuffer* message);
 
   // Handles the standard USB requests.
   void HandleStandardControl(int sockfd, const UsbipCmdSubmit& usb_request,
