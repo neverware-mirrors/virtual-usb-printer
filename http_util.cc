@@ -213,7 +213,7 @@ SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message) {
 
 bool ContainsFinalChunk(const SmartBuffer& message) {
   ssize_t i = message.FindFirstOccurrence("0\r\n\r\n");
-  return i > 0 && message.size() == i + 5;
+  return i >= 0 && message.size() == i + 5;
 }
 
 bool ProcessMessageChunks(SmartBuffer* message) {
