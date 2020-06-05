@@ -173,7 +173,15 @@ size_t ExtractChunkSize(const SmartBuffer& message) {
   for (size_t i = 0; i < end; ++i) {
     hex_string += static_cast<char>(contents[i]);
   }
-  return std::stoll(hex_string, 0, 16);
+
+  uint32_t chunk_size = 0;
+  if (!base::HexStringToUInt(hex_string, &chunk_size)) {
+    LOG(ERROR) << "Could not parse '" << hex_string << "' as hex.";
+    LOG(ERROR) << "Further errors may occur due to incorrect chunk reading.";
+    return 0;
+  }
+
+  return chunk_size;
 }
 
 SmartBuffer ParseHttpChunkedMessage(SmartBuffer* message) {
