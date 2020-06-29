@@ -4,6 +4,8 @@
 
 #include "value_util.h"
 
+#include <utility>
+
 #include <base/files/file_path.h>
 #include <base/files/file_util.h>
 #include <base/json/json_reader.h>
@@ -20,12 +22,9 @@ base::Optional<std::string> GetJSONContents(const std::string& file_path) {
 }
 
 std::unique_ptr<base::Value> GetJSONValue(const std::string& json_contents) {
-  base::JSONReader json_reader;
-  // TODO(crbug/1054279): migrate to base::JSONReader::Read after uprev.
-  std::unique_ptr<base::Value> value =
-      json_reader.ReadDeprecated(json_contents);
+  base::Optional<base::Value> value = base::JSONReader::Read(json_contents);
   CHECK(value) << "Failed to parse JSON string";
-  return value;
+  return base::Value::ToUniquePtrValue(std::move(value.value()));
 }
 
 const base::DictionaryValue* GetDictionary(const base::Value* value) {

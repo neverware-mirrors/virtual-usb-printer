@@ -18,9 +18,13 @@ base::Optional<std::string> GetJSONContents(const std::string& file_path);
 
 // Use a JSONReader to parse |json_contents| and return a pointer to the
 // underlying Value object.
+// TODO(crbug.com/1099111): replace this function by base::JSONReader::Read with
+// CHECK for non base::nullopt.
 std::unique_ptr<base::Value> GetJSONValue(const std::string& json_contents);
 
 // Utility function for converting |value| into a DictionaryValue object.
+// TODO(crbug.com/1099111): remove this after all base::DictionaryValue objects
+// are migrated to base::Value
 const base::DictionaryValue* GetDictionary(const base::Value* value);
 
 #endif  // __VALUD_UTIL_H__

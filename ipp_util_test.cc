@@ -290,7 +290,7 @@ TEST(GetAttributes, ValidAttributes) {
                    actual_value2.get())};
 
   std::vector<IppAttribute> actual =
-      GetAttributes(operation_attributes_value.get(), "operation_attributes");
+      GetAttributes(*operation_attributes_value, "operation_attributes");
 
   EXPECT_EQ(actual, expected);
 }
@@ -300,8 +300,7 @@ TEST(GetAttributes, InvalidAttributes) {
   // a dictionary.
   const std::string json_contents1 = "123";
   std::unique_ptr<base::Value> value1 = GetJSONValue(json_contents1);
-  EXPECT_DEATH(GetAttributes(value1.get(), ""),
-               "Failed to retrieve dictionary");
+  EXPECT_DEATH(GetAttributes(*value1, ""), "Failed to retrieve dictionary");
 
   // We expect this case to fail because the there is no attributes list for the
   // provided key.
@@ -313,14 +312,14 @@ TEST(GetAttributes, InvalidAttributes) {
     }
   )";
   std::unique_ptr<base::Value> value2 = GetJSONValue(json_contents2);
-  EXPECT_DEATH(GetAttributes(value2.get(), "operation_attributes"),
+  EXPECT_DEATH(GetAttributes(*value2, "operation_attributes"),
                "Failed to extract attributes list for key");
 
   const std::string json_contents3 = R"(
     { "printer_attributes": "not a list" }
   )";
   std::unique_ptr<base::Value> value3 = GetJSONValue(json_contents3);
-  EXPECT_DEATH(GetAttributes(value3.get(), "printer_attributes"),
+  EXPECT_DEATH(GetAttributes(*value3, "printer_attributes"),
                "Failed to extract attributes list for key");
 }
 
@@ -577,7 +576,7 @@ TEST(AddPrinterAttributes, ValidAttributes) {
   })";
   std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
   std::vector<IppAttribute> attributes =
-      GetAttributes(value.get(), kOperationAttributes);
+      GetAttributes(*value, kOperationAttributes);
 
   const std::string expected_string =
       "\x01"                         // Tag for operation-attributes.

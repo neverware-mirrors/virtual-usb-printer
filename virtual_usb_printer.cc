@@ -39,6 +39,7 @@ constexpr char kUsage[] =
 
 // Create a new UsbDescriptors object using the USB descriptors defined in
 // |printer_config|.
+// TODO(crbug.com/1099111): change base::DictionaryValue to base::Value
 UsbDescriptors CreateUsbDescriptors(
     const base::DictionaryValue* printer_config) {
   UsbDeviceDescriptor device = GetDeviceDescriptor(printer_config);
@@ -73,9 +74,8 @@ base::Optional<EsclManager> InitializeEsclManager(
     return base::nullopt;
   }
 
-  // TODO(crbug/1054279): Use new Read API after libchrome uprev.
-  std::unique_ptr<base::Value> capabilities_json =
-      base::JSONReader::ReadDeprecated(capabilities_string);
+  base::Optional<base::Value> capabilities_json =
+      base::JSONReader::Read(capabilities_string);
   if (!capabilities_json) {
     LOG(ERROR) << "Failed to parse capabilities as JSON";
     return base::nullopt;
@@ -118,15 +118,14 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  base::JSONReader json_reader;
-  // TODO(crbug/1054279): migrate to base::JSONReader::Read after uprev.
-  std::unique_ptr<base::Value> descriptors =
-      json_reader.ReadDeprecated(*descriptors_contents);
-  if (descriptors == nullptr) {
+  base::Optional<base::Value> descriptors =
+      base::JSONReader::Read(*descriptors_contents);
+  if (!descriptors) {
     LOG(ERROR) << "Failed to parse " << FLAGS_descriptors_path;
     return 1;
   }
 
+  // TODO(crbug.com/1099111): change base::DictionaryValue to base::Value
   base::DictionaryValue* descriptors_dictionary;
   if (!descriptors->GetAsDictionary(&descriptors_dictionary)) {
     LOG(ERROR) << "Failed to extract printer configuration as dictionary";
@@ -139,7 +138,6 @@ int main(int argc, char* argv[]) {
 
   IppManager ipp_manager;
   // Load ipp attributes if |FLAGS_attributes_path| is set.
-  std::unique_ptr<base::Value> attributes;
   if (!FLAGS_attributes_path.empty()) {
     base::Optional<std::string> attributes_contents =
         GetJSONContents(FLAGS_attributes_path);
@@ -148,21 +146,21 @@ int main(int argc, char* argv[]) {
                  << FLAGS_attributes_path;
       return 1;
     }
-    // TODO(crbug/1054279): migrate to base::JSONReader::Read after uprev.
-    attributes = json_reader.ReadDeprecated(*attributes_contents);
-    if (attributes == nullptr) {
+    base::Optional<base::Value> result =
+        base::JSONReader::Read(*attributes_contents);
+    if (!result) {
       LOG(ERROR) << "Failed to parse " << FLAGS_attributes_path;
       return 1;
     }
 
     std::vector<IppAttribute> operation_attributes =
-        GetAttributes(attributes.get(), kOperationAttributes);
+        GetAttributes(*result, kOperationAttributes);
     std::vector<IppAttribute> printer_attributes =
-        GetAttributes(attributes.get(), kPrinterAttributes);
+        GetAttributes(*result, kPrinterAttributes);
     std::vector<IppAttribute> job_attributes =
-        GetAttributes(attributes.get(), kJobAttributes);
+        GetAttributes(*result, kJobAttributes);
     std::vector<IppAttribute> unsupported_attributes =
-        GetAttributes(attributes.get(), kUnsupportedAttributes);
+        GetAttributes(*result, kUnsupportedAttributes);
 
     ipp_manager =
         IppManager(operation_attributes, printer_attributes, job_attributes,

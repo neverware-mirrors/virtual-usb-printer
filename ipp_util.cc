@@ -19,11 +19,12 @@
 
 namespace {
 
-std::vector<IppAttribute> GetAttributes(const base::ListValue* attributes) {
+// TODO(crbug.com/1099111): change base::{Dictioanry,List}Value to base::Value
+std::vector<IppAttribute> GetAttributes(const base::Value* attributes) {
   std::vector<IppAttribute> ipp_attributes;
-  for (std::size_t i = 0; i < attributes->GetSize(); ++i) {
+  for (std::size_t i = 0; i < attributes->GetList().size(); ++i) {
     const base::DictionaryValue* attributes_dictionary;
-    if (!attributes->GetDictionary(i, &attributes_dictionary)) {
+    if (!attributes->GetList()[i].GetAsDictionary(&attributes_dictionary)) {
       LOG(ERROR)
           << "Failed to extract dictionary value from attributes list at index "
           << i;
@@ -208,6 +209,7 @@ bool IppAttribute::IsList() const {
 }
 
 size_t IppAttribute::GetListSize() const {
+  // TODO(crbug.com/1099111): change base::{Dictioanry,List}Value to base::Value
   const base::ListValue* values;
   CHECK(value_->GetAsList(&values))
       << "Failed to retrieve list value from " << name_;
@@ -236,6 +238,7 @@ std::string IppAttribute::GetString() const {
 }
 
 std::vector<bool> IppAttribute::GetBools() const {
+  // TODO(crbug.com/1099111): change base::ListValue to base::Value
   const base::ListValue* values;
   CHECK(value_->GetAsList(&values))
       << "Failed to retrieve list value from " << name_;
@@ -251,6 +254,7 @@ std::vector<bool> IppAttribute::GetBools() const {
 }
 
 std::vector<int> IppAttribute::GetInts() const {
+  // TODO(crbug.com/1099111): change base::ListValue to base::Value
   const base::ListValue* values;
   CHECK(value_->GetAsList(&values))
       << "Failed to retrieve list value from " << name_;
@@ -266,6 +270,7 @@ std::vector<int> IppAttribute::GetInts() const {
 }
 
 std::vector<std::string> IppAttribute::GetStrings() const {
+  // TODO(crbug.com/1099111): change base::ListValue to base::Value
   const base::ListValue* values;
   CHECK(value_->GetAsList(&values))
       << "Failed to retrieve list value from " << name_;
@@ -280,6 +285,7 @@ std::vector<std::string> IppAttribute::GetStrings() const {
 }
 
 std::vector<uint8_t> IppAttribute::GetBytes() const {
+  // TODO(crbug.com/1099111): change base::ListValue to base::Value
   const base::ListValue* values;
   CHECK(value_->GetAsList(&values))
       << "Failed to retrieve list value from " << name_;
@@ -341,6 +347,7 @@ bool RemoveIppAttributes(SmartBuffer* buf) {
 }
 
 IppAttribute GetAttribute(const base::Value* attribute) {
+  // TODO(crbug.com/1099111): change base::DictionaryValue to base::Value
   const base::DictionaryValue* dictionary;
   CHECK(attribute->GetAsDictionary(&dictionary))
       << "Failed to retrieve dictionary value from attributes";
@@ -358,15 +365,13 @@ IppAttribute GetAttribute(const base::Value* attribute) {
   return IppAttribute(type, name, value);
 }
 
-std::vector<IppAttribute> GetAttributes(const base::Value* attributes,
+std::vector<IppAttribute> GetAttributes(const base::Value& attributes,
                                         const std::string& key) {
-  const base::DictionaryValue* dictionary;
-  CHECK(attributes->GetAsDictionary(&dictionary))
+  CHECK(attributes.is_dict())
       << "Failed to retrieve dictionary value from attributes";
 
-  const base::ListValue* attributes_list;
-  CHECK(dictionary->GetList(key, &attributes_list))
-      << "Failed to extract attributes list for key " << key;
+  const base::Value* attributes_list = attributes.FindListKey(key);
+  CHECK(attributes_list) << "Failed to extract attributes list for key " << key;
 
   return GetAttributes(attributes_list);
 }
