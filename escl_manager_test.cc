@@ -41,8 +41,8 @@ constexpr char kNewScan[] =
                "<pwg:YOffset>0</pwg:YOffset>"
            "</pwg:ScanRegion>"
        "</pwg:ScanRegions>"
-       "<pwg:DocumentFormat>png</pwg:DocumentFormat>"
-       "<scan:ColorMode>BlackAndWhite1</scan:ColorMode>"
+       "<pwg:DocumentFormat>application/pdf</pwg:DocumentFormat>"
+       "<scan:ColorMode>RGB24</scan:ColorMode>"
        "<scan:XResolution>300</scan:XResolution>"
        "<scan:YResolution>300</scan:YResolution>"
        "<pwg:InputSource>Platen</pwg:InputSource>"
@@ -215,8 +215,8 @@ TEST(ScanSettings, Parse) {
   base::Optional<ScanSettings> opt_settings = ScanSettingsFromXml(xml);
   EXPECT_TRUE(opt_settings);
   ScanSettings settings = opt_settings.value();
-  EXPECT_EQ(settings.document_format, "png");
-  EXPECT_EQ(settings.color_mode, kBlackAndWhite);
+  EXPECT_EQ(settings.document_format, "application/pdf");
+  EXPECT_EQ(settings.color_mode, kRGB);
   EXPECT_EQ(settings.input_source, "Platen");
   EXPECT_EQ(settings.x_resolution, 300);
   EXPECT_EQ(settings.y_resolution, 300);
@@ -291,8 +291,10 @@ TEST(HandleEsclRequest, ScanJobs) {
   request.method = "POST";
   request.uri = "/eSCL/ScanJobs";
 
-  ScannerCapabilities caps;
-  EsclManager manager(caps, base::FilePath());
+  base::Optional<ScannerCapabilities> caps =
+      CreateScannerCapabilitiesFromConfig(CreateCapabilitiesJson());
+  ASSERT_TRUE(caps);
+  EsclManager manager(caps.value(), base::FilePath());
   std::vector<uint8_t> xml(kNewScan, kNewScan + strlen(kNewScan));
   SmartBuffer body(xml);
 
@@ -300,13 +302,33 @@ TEST(HandleEsclRequest, ScanJobs) {
   EXPECT_EQ(response.status, "201 Created");
 }
 
+TEST(HandleEsclRequest, InvalidScanJobs) {
+  HttpRequest request;
+  request.method = "POST";
+  request.uri = "/eSCL/ScanJobs";
+
+  Value json = CreateCapabilitiesJson();
+  json.FindPath({"Platen", "DocumentFormats"})->GetList().pop_back();
+  base::Optional<ScannerCapabilities> caps =
+      CreateScannerCapabilitiesFromConfig(std::move(json));
+  ASSERT_TRUE(caps);
+  EsclManager manager(caps.value(), base::FilePath());
+  std::vector<uint8_t> xml(kNewScan, kNewScan + strlen(kNewScan));
+  SmartBuffer body(xml);
+
+  HttpResponse response = manager.HandleEsclRequest(request, body);
+  EXPECT_EQ(response.status, "409 Conflict");
+}
+
 TEST(HandleEsclRequest, DeleteExistingScanJob) {
   HttpRequest request;
   request.method = "POST";
   request.uri = "/eSCL/ScanJobs";
 
-  ScannerCapabilities caps;
-  EsclManager manager(caps, base::FilePath());
+  base::Optional<ScannerCapabilities> caps =
+      CreateScannerCapabilitiesFromConfig(CreateCapabilitiesJson());
+  ASSERT_TRUE(caps);
+  EsclManager manager(caps.value(), base::FilePath());
   std::vector<uint8_t> xml(kNewScan, kNewScan + strlen(kNewScan));
   SmartBuffer body(xml);
 

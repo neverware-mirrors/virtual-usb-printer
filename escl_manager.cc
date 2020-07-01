@@ -129,6 +129,17 @@ std::string JobStateAsString(JobState state) {
   }
 }
 
+std::string ColorModeAsString(ColorMode mode) {
+  switch (mode) {
+    case kBlackAndWhite:
+      return "BlackAndWhite1";
+    case kGrayscale:
+      return "Grayscale8";
+    case kRGB:
+      return "RGB24";
+  }
+}
+
 }  // namespace
 
 base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
@@ -222,13 +233,56 @@ HttpResponse EsclManager::HandleEsclRequest(const HttpRequest& request,
 HttpResponse EsclManager::HandleCreateScanJob(const SmartBuffer& request_body) {
   HttpResponse response;
 
-  base::Optional<ScanSettings> settings =
+  base::Optional<ScanSettings> settings_opt =
       ScanSettingsFromXml(request_body.contents());
-  if (!settings) {
+  if (!settings_opt) {
     LOG(ERROR) << "Could not parse ScanSettings from request body";
     response.status = "415 Unsupported Media Type";
     return response;
   }
+  ScanSettings settings = settings_opt.value();
+
+  SourceCapabilities caps;
+  if (settings.input_source == "Platen") {
+    caps = scanner_capabilities_.platen_capabilities;
+  } else {
+    LOG(ERROR) << "Requested unknown source '" << settings.input_source << "'";
+    response.status = "409 Conflict";
+    return response;
+  }
+
+  if (!base::Contains(caps.color_modes,
+                      ColorModeAsString(settings.color_mode))) {
+    LOG(ERROR) << "Requested unsupported color mode '"
+               << ColorModeAsString(settings.color_mode) << "'";
+    for (const auto& mode : caps.color_modes) {
+      LOG(ERROR) << "modes: " << mode;
+    }
+    response.status = "409 Conflict";
+    return response;
+  }
+
+  if (!base::Contains(caps.formats, settings.document_format)) {
+    LOG(ERROR) << "Requested unsupported document format '"
+               << settings.document_format << "'";
+    response.status = "409 Conflict";
+    return response;
+  }
+
+  if (settings.x_resolution != settings.y_resolution) {
+    LOG(ERROR) << "Scanner cannot support different resolutions in X and Y: "
+               << settings.x_resolution << " " << settings.y_resolution;
+    response.status = "409 Conflict";
+    return response;
+  }
+
+  if (!base::Contains(caps.resolutions, settings.x_resolution)) {
+    LOG(ERROR) << "Requested unsupported resolution '" << settings.x_resolution
+               << "'";
+    response.status = "409 Conflict";
+    return response;
+  }
+
   std::string uuid = GenerateUUID();
   JobInfo job;
   job.created = base::TimeTicks::Now();
