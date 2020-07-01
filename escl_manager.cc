@@ -179,6 +179,17 @@ base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
   }
   result.platen_capabilities = platen_capabilities.value();
 
+  value = config.FindKeyOfType("ADF", base::Value::Type::DICTIONARY);
+  if (value) {
+    base::Optional<SourceCapabilities> adf_capabilities =
+        CreateSourceCapabilitiesFromConfig(*value);
+    if (!adf_capabilities) {
+      LOG(ERROR) << "Parsing ADF capabilities failed";
+      return base::nullopt;
+    }
+    result.adf_capabilities = adf_capabilities;
+  }
+
   return result;
 }
 
@@ -245,6 +256,13 @@ HttpResponse EsclManager::HandleCreateScanJob(const SmartBuffer& request_body) {
   SourceCapabilities caps;
   if (settings.input_source == "Platen") {
     caps = scanner_capabilities_.platen_capabilities;
+  } else if (settings.input_source == "ADF") {
+    if (!scanner_capabilities_.adf_capabilities.has_value()) {
+      LOG(ERROR) << "Requested ADF source but printer doesn't have an ADF";
+      response.status = "409 Conflict";
+      return response;
+    }
+    caps = scanner_capabilities_.adf_capabilities.value();
   } else {
     LOG(ERROR) << "Requested unknown source '" << settings.input_source << "'";
     response.status = "409 Conflict";

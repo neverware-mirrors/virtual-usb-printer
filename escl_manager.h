@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef __ESCL_MANAGER_H__
-#define __ESCL_MANAGER_H__
+#ifndef ESCL_MANAGER_H__
+#define ESCL_MANAGER_H__
 
 #include <string>
 #include <vector>
@@ -26,7 +26,11 @@ struct ScannerCapabilities {
   std::string make_and_model;
   std::string serial_number;
 
+  // The scan properties supported by the input sources for this scanner.
+  // We require that a virtual scanner supports the Platen (flatbed) as an input
+  // source, but supporting the Automatic Document Feeder (ADF) is optional.
   SourceCapabilities platen_capabilities;
+  base::Optional<SourceCapabilities> adf_capabilities;
 };
 
 base::Optional<ScannerCapabilities> CreateScannerCapabilitiesFromConfig(
@@ -137,4 +141,4 @@ class EsclManager {
   base::FilePath document_path_;
 };
 
-#endif  // __ESCL_MANAGER_H__
+#endif  // ESCL_MANAGER_H__

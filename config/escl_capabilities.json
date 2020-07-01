@@ -2,8 +2,13 @@
   "MakeAndModel": "Brother HL-L2395DW series",
   "SerialNumber": "U64968H9N994548",
   "Platen": {
-	"ColorModes": ["BlackAndWhite1", "Grayscale8", "RGB24"],
-	"DocumentFormats": ["application/pdf", "image/jpeg"],
-	"Resolutions": [100, 200, 300, 600]
+    "ColorModes": ["BlackAndWhite1", "Grayscale8", "RGB24"],
+    "DocumentFormats": ["application/pdf", "image/jpeg"],
+    "Resolutions": [100, 200, 300, 600]
+  },
+  "ADF": {
+    "ColorModes": ["BlackAndWhite1", "Grayscale8"],
+    "DocumentFormats": ["image/jpeg"],
+    "Resolutions": [100, 200]
   }
 }
