@@ -138,6 +138,7 @@ int main(int argc, char* argv[]) {
 
   IppManager ipp_manager;
   // Load ipp attributes if |FLAGS_attributes_path| is set.
+  base::Optional<base::Value> result;
   if (!FLAGS_attributes_path.empty()) {
     base::Optional<std::string> attributes_contents =
         GetJSONContents(FLAGS_attributes_path);
@@ -146,7 +147,7 @@ int main(int argc, char* argv[]) {
                  << FLAGS_attributes_path;
       return 1;
     }
-    base::Optional<base::Value> result =
+    result =
         base::JSONReader::Read(*attributes_contents);
     if (!result) {
       LOG(ERROR) << "Failed to parse " << FLAGS_attributes_path;
