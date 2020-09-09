@@ -98,19 +98,19 @@ TEST(ScannerCapabilities, Initialize) {
 
 TEST(ScannerCapabilities, InitializeFailColorModeHasInteger) {
   Value json = CreateCapabilitiesJson();
-  json.FindPath({"Platen", "ColorModes"})->GetList().push_back(Value(9));
+  json.FindPath({"Platen", "ColorModes"})->Append(Value(9));
   EXPECT_FALSE(CreateScannerCapabilitiesFromConfig(std::move(json)));
 }
 
 TEST(ScannerCapabilities, InitializeFailDocumentFormatsHasDouble) {
   Value json = CreateCapabilitiesJson();
-  json.FindPath({"Platen", "DocumentFormats"})->GetList().push_back(Value(2.7));
+  json.FindPath({"Platen", "DocumentFormats"})->Append(Value(2.7));
   EXPECT_FALSE(CreateScannerCapabilitiesFromConfig(std::move(json)));
 }
 
 TEST(ScannerCapabilities, InitializeFailResolutionsHasString) {
   Value json = CreateCapabilitiesJson();
-  json.FindPath({"Platen", "Resolutions"})->GetList().push_back(Value("600"));
+  json.FindPath({"Platen", "Resolutions"})->Append(Value("600"));
   EXPECT_FALSE(CreateScannerCapabilitiesFromConfig(std::move(json)));
 }
 
@@ -308,7 +308,10 @@ TEST(HandleEsclRequest, InvalidScanJobs) {
   request.uri = "/eSCL/ScanJobs";
 
   Value json = CreateCapabilitiesJson();
-  json.FindPath({"Platen", "DocumentFormats"})->GetList().pop_back();
+  {
+    auto* value = json.FindPath({"Platen", "DocumentFormats"});
+    value->EraseListIter(value->GetList().end() - 1);
+  }
   base::Optional<ScannerCapabilities> caps =
       CreateScannerCapabilitiesFromConfig(std::move(json));
   ASSERT_TRUE(caps);
