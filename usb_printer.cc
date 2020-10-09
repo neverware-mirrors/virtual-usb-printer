@@ -505,10 +505,11 @@ void UsbPrinter::HandleBulkInRequest(int sockfd,
                                      const UsbipCmdSubmit& usb_request) {
   InterfaceManager* im = GetInterfaceManager(usb_request.header.ep);
   if (im->QueueEmpty()) {
+    LOG(ERROR) << "No queued messages, sending empty response.";
     SendUsbControlResponse(sockfd, usb_request, 0, 0);
     return;
   }
-  LOG(INFO) << "Responding with queued message...";
+
   SmartBuffer http_message = im->PopMessage();
 
   size_t max_size = usb_request.transfer_buffer_length;
@@ -516,6 +517,7 @@ void UsbPrinter::HandleBulkInRequest(int sockfd,
   UsbipRetSubmit response = CreateUsbipRetSubmit(usb_request);
   response.header.direction = 1;
   response.actual_length = std::min(max_size, http_message.size());
+  LOG(INFO) << "Sending " << response.actual_length << " byte response.";
   size_t response_size = sizeof(response);
   PackUsbip(reinterpret_cast<int*>(&response), response_size);
   SmartBuffer response_buffer(response_size);
@@ -526,7 +528,6 @@ void UsbPrinter::HandleBulkInRequest(int sockfd,
     SmartBuffer leftover(leftover_size);
     leftover.Add(http_message, max_size);
     http_message.Shrink(max_size);
-    LOG(INFO) << "Queueing leftover message...";
     im->QueueMessage(leftover);
   }
   response_buffer.Add(http_message);
