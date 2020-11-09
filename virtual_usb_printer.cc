@@ -39,9 +39,7 @@ constexpr char kUsage[] =
 
 // Create a new UsbDescriptors object using the USB descriptors defined in
 // |printer_config|.
-// TODO(crbug.com/1099111): change base::DictionaryValue to base::Value
-UsbDescriptors CreateUsbDescriptors(
-    const base::DictionaryValue* printer_config) {
+UsbDescriptors CreateUsbDescriptors(const base::Value& printer_config) {
   UsbDeviceDescriptor device = GetDeviceDescriptor(printer_config);
   UsbConfigurationDescriptor configuration =
       GetConfigurationDescriptor(printer_config);
@@ -125,14 +123,12 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // TODO(crbug.com/1099111): change base::DictionaryValue to base::Value
-  base::DictionaryValue* descriptors_dictionary;
-  if (!descriptors->GetAsDictionary(&descriptors_dictionary)) {
+  if (!descriptors->is_dict()) {
     LOG(ERROR) << "Failed to extract printer configuration as dictionary";
     return 1;
   }
 
-  UsbDescriptors usb_descriptors = CreateUsbDescriptors(descriptors_dictionary);
+  UsbDescriptors usb_descriptors = CreateUsbDescriptors(*descriptors);
 
   base::FilePath document_output_path(FLAGS_record_doc_path);
 
@@ -147,8 +143,7 @@ int main(int argc, char* argv[]) {
                  << FLAGS_attributes_path;
       return 1;
     }
-    result =
-        base::JSONReader::Read(*attributes_contents);
+    result = base::JSONReader::Read(*attributes_contents);
     if (!result) {
       LOG(ERROR) << "Failed to parse " << FLAGS_attributes_path;
       return 1;

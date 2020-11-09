@@ -22,36 +22,40 @@ TEST(GetByteValue, ValidValue) {
   const std::string json_contents1 = R"(
     { "test_byte": 8 }
   )";
-  std::unique_ptr<base::Value> value1 = GetJSONValue(json_contents1);
-  const base::DictionaryValue* dict1 = GetDictionary(value1.get());
+  base::Optional<base::Value> value1 = GetJSONValue(json_contents1);
+  ASSERT_TRUE(value1->is_dict()) << "Failed to extract value of type "
+                                 << value1->type() << " as dictionary";
   uint8_t expected1 = 8;
-  EXPECT_EQ(GetByteValue(dict1, "test_byte"), expected1);
+  EXPECT_EQ(GetByteValue(*value1, "test_byte"), expected1);
 
   const std::string json_contents2 = R"(
     { "test_byte": 255 }
   )";
-  std::unique_ptr<base::Value> value2 = GetJSONValue(json_contents2);
-  const base::DictionaryValue* dict2 = GetDictionary(value2.get());
+  base::Optional<base::Value> value2 = GetJSONValue(json_contents2);
+  ASSERT_TRUE(value2->is_dict()) << "Failed to extract value of type "
+                                 << value2->type() << " as dictionary";
   uint8_t expected2 = 255;
-  EXPECT_EQ(GetByteValue(dict2, "test_byte"), expected2);
+  EXPECT_EQ(GetByteValue(*value2, "test_byte"), expected2);
 }
 
 TEST(GetByteValue, InvalidPath) {
   const std::string json_contents = R"(
     { "test_byte": 8 }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetByteValue(dict, "wrong_path"), "Failed to extract path");
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetByteValue(*value, "wrong_path"), "Failed to extract path");
 }
 
 TEST(GetByteValue, InvalidValue) {
   const std::string json_contents = R"(
     { "test_byte": 256 }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetByteValue(dict, "test_byte"),
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetByteValue(*value, "test_byte"),
                "Extracted value.*is too large");
 }
 
@@ -59,36 +63,40 @@ TEST(GetWordValue, ValidValue) {
   const std::string json_contents1 = R"(
     { "test_byte": 8 }
   )";
-  std::unique_ptr<base::Value> value1 = GetJSONValue(json_contents1);
-  const base::DictionaryValue* dict1 = GetDictionary(value1.get());
+  base::Optional<base::Value> value1 = GetJSONValue(json_contents1);
+  ASSERT_TRUE(value1->is_dict()) << "Failed to extract value of type "
+                                 << value1->type() << " as dictionary";
   uint16_t expected1 = 8;
-  EXPECT_EQ(GetWordValue(dict1, "test_byte"), expected1);
+  EXPECT_EQ(GetWordValue(*value1, "test_byte"), expected1);
 
   const std::string json_contents2 = R"(
     { "test_byte": 65535 }
   )";
-  std::unique_ptr<base::Value> value2 = GetJSONValue(json_contents2);
-  const base::DictionaryValue* dict2 = GetDictionary(value2.get());
+  base::Optional<base::Value> value2 = GetJSONValue(json_contents2);
+  ASSERT_TRUE(value2->is_dict()) << "Failed to extract value of type "
+                                 << value2->type() << " as dictionary";
   uint16_t expected2 = 65535;
-  EXPECT_EQ(GetWordValue(dict2, "test_byte"), expected2);
+  EXPECT_EQ(GetWordValue(*value2, "test_byte"), expected2);
 }
 
 TEST(GetWordValue, InvalidPath) {
   const std::string json_contents = R"(
     { "test_byte": 8 }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetWordValue(dict, "wrong_path"), "Failed to extract path");
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetWordValue(*value, "wrong_path"), "Failed to extract path");
 }
 
 TEST(GetWordValue, InvalidValue) {
   const std::string json_contents = R"(
     { "test_byte": 65536 }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetWordValue(dict, "test_byte"),
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetWordValue(*value, "test_byte"),
                "Extracted value.*is too large");
 }
 
@@ -113,11 +121,12 @@ TEST(GetDeviceDescriptor, ValidDescriptor) {
       }
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
   const UsbDeviceDescriptor expected(18, 1, 272, 0, 0, 0, 8, 1193, 10216, 0, 1,
                                      2, 1, 1);
-  EXPECT_EQ(GetDeviceDescriptor(dict), expected);
+  EXPECT_EQ(GetDeviceDescriptor(*value), expected);
 }
 
 TEST(GetDeviceDescriptor, InvalidBLength) {
@@ -141,9 +150,10 @@ TEST(GetDeviceDescriptor, InvalidBLength) {
       }
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetDeviceDescriptor(dict), "bLength value.*is not the same");
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetDeviceDescriptor(*value), "bLength value.*is not the same");
 }
 
 TEST(GetConfigurationDescriptor, ValidDescriptor) {
@@ -161,10 +171,11 @@ TEST(GetConfigurationDescriptor, ValidDescriptor) {
       }
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
   const UsbConfigurationDescriptor expected(9, 2, 32, 1, 1, 0, 128, 0);
-  EXPECT_EQ(GetConfigurationDescriptor(dict), expected);
+  EXPECT_EQ(GetConfigurationDescriptor(*value), expected);
 }
 
 TEST(GetConfigurationDescriptor, InvalidBLength) {
@@ -182,9 +193,10 @@ TEST(GetConfigurationDescriptor, InvalidBLength) {
       }
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetConfigurationDescriptor(dict),
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetConfigurationDescriptor(*value),
                "bLength value.*is not the same");
 }
 
@@ -204,10 +216,11 @@ TEST(GetDeviceQualifierDescriptor, ValidDescriptor) {
       }
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
   const UsbDeviceQualifierDescriptor expected(10, 6, 512, 0, 0, 0, 8, 1, 0);
-  EXPECT_EQ(GetDeviceQualifierDescriptor(dict), expected);
+  EXPECT_EQ(GetDeviceQualifierDescriptor(*value), expected);
 }
 
 TEST(GetDeviceQualifierDescriptor, InvalidBLength) {
@@ -226,9 +239,10 @@ TEST(GetDeviceQualifierDescriptor, InvalidBLength) {
       }
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetDeviceQualifierDescriptor(dict),
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetDeviceQualifierDescriptor(*value),
                "bLength value.*is not the same");
 }
 
@@ -249,11 +263,12 @@ TEST(GetInterfaceDescriptors, ValidDescriptors) {
       }]
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
   const std::vector<UsbInterfaceDescriptor> expected = {
       UsbInterfaceDescriptor(9, 4, 0, 0, 2, 7, 1, 2, 0)};
-  EXPECT_EQ(GetInterfaceDescriptors(dict), expected);
+  EXPECT_EQ(GetInterfaceDescriptors(*value), expected);
 }
 
 TEST(GetInterfaceDescriptors, InvalidBLength) {
@@ -273,9 +288,11 @@ TEST(GetInterfaceDescriptors, InvalidBLength) {
       }]
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetInterfaceDescriptors(dict), "bLength value.*is not the same");
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetInterfaceDescriptors(*value),
+               "bLength value.*is not the same");
 }
 
 TEST(GetEndpointDescriptor, ValidDescriptor) {
@@ -289,10 +306,11 @@ TEST(GetEndpointDescriptor, ValidDescriptor) {
       "bInterval": 0
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
   const UsbEndpointDescriptor expected(7, 5, 129, 2, 512, 0);
-  EXPECT_EQ(GetEndpointDescriptor(dict), expected);
+  EXPECT_EQ(GetEndpointDescriptor(*value), expected);
 }
 
 TEST(GetEndpointDescriptor, InvalidBLength) {
@@ -306,9 +324,10 @@ TEST(GetEndpointDescriptor, InvalidBLength) {
       "bInterval": 0
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
-  EXPECT_DEATH(GetEndpointDescriptor(dict), "bLength value.*is not the same");
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
+  EXPECT_DEATH(GetEndpointDescriptor(*value), "bLength value.*is not the same");
 }
 
 TEST(GetEndpointDescriptorMap, ValidDescriptor) {
@@ -342,13 +361,14 @@ TEST(GetEndpointDescriptorMap, ValidDescriptor) {
       }]
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
   std::map<uint8_t, std::vector<UsbEndpointDescriptor>> expected = {
       {0,
        {UsbEndpointDescriptor(7, 5, 1, 2, 512, 0),
         UsbEndpointDescriptor(7, 5, 129, 2, 512, 0)}}};
-  EXPECT_EQ(GetEndpointDescriptorMap(dict), expected);
+  EXPECT_EQ(GetEndpointDescriptorMap(*value), expected);
 }
 
 TEST(ConvertStringToStringDescriptor, ValidString) {
@@ -405,8 +425,9 @@ TEST(GetStringDescriptors, ValidDescriptors) {
       ]
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
 
   const std::vector<char> expected_language_descriptor = {0x04, 0x03, 0x09,
                                                           0x04};
@@ -422,7 +443,7 @@ TEST(GetStringDescriptors, ValidDescriptors) {
   std::vector<std::vector<char>> expected = {expected_language_descriptor,
                                              expected_string_descriptor1,
                                              expected_string_descriptor2};
-  EXPECT_EQ(GetStringDescriptors(dict), expected);
+  EXPECT_EQ(GetStringDescriptors(*value), expected);
 }
 
 TEST(GetIEEEDeviceId, ValidDeviceId) {
@@ -435,12 +456,13 @@ TEST(GetIEEEDeviceId, ValidDeviceId) {
       }
     }
   )";
-  std::unique_ptr<base::Value> value = GetJSONValue(json_contents);
-  const base::DictionaryValue* dict = GetDictionary(value.get());
+  base::Optional<base::Value> value = GetJSONValue(json_contents);
+  ASSERT_TRUE(value->is_dict()) << "Failed to extract value of type "
+                                << value->type() << " as dictionary";
   const std::vector<char> expected = {
       0,   26,  'M', 'F', 'G', ':', 'D', 'V', '3', ';', 'C', 'M', 'D',
       ':', 'P', 'D', 'F', ';', 'M', 'D', 'L', ':', 'V', 'T', 'L', ';'};
-  EXPECT_EQ(GetIEEEDeviceId(dict), expected);
+  EXPECT_EQ(GetIEEEDeviceId(*value), expected);
 }
 
 }  // namespace

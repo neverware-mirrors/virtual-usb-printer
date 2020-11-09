@@ -21,15 +21,8 @@ base::Optional<std::string> GetJSONContents(const std::string& file_path) {
   return json_contents;
 }
 
-std::unique_ptr<base::Value> GetJSONValue(const std::string& json_contents) {
+base::Optional<base::Value> GetJSONValue(const std::string& json_contents) {
   base::Optional<base::Value> value = base::JSONReader::Read(json_contents);
   CHECK(value) << "Failed to parse JSON string";
-  return base::Value::ToUniquePtrValue(std::move(value.value()));
-}
-
-const base::DictionaryValue* GetDictionary(const base::Value* value) {
-  const base::DictionaryValue* dict;
-  CHECK(value->GetAsDictionary(&dict)) << "Failed to extract value of type "
-                                       << value->type() << " as dictionary";
-  return dict;
+  return value;
 }

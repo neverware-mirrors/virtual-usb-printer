@@ -26,123 +26,113 @@ const size_t kMaxStringDescriptorSize = 126;
 
 }  // namespace
 
-uint8_t GetByteValue(const base::DictionaryValue* dict,
-                     const std::string& path) {
-  int val;
-  CHECK(dict->GetInteger(path, &val))
-      << "Failed to extract path" << path << " from printer config";
-  CHECK_LE(val, UCHAR_MAX) << "Extracted value " << val
-                           << " is too large to fit into a byte";
-  return static_cast<uint8_t>(val);
+uint8_t GetByteValue(const base::Value& dict, const std::string& path) {
+  CHECK(dict.is_dict()) << "Printer config is not a dictionary";
+  base::Optional<int> val = dict.FindIntPath(path);
+  CHECK(val.has_value()) << "Failed to extract path" << path
+                         << " from printer config";
+  CHECK_LE(*val, UCHAR_MAX)
+      << "Extracted value " << *val << " is too large to fit into a byte";
+  return static_cast<uint8_t>(*val);
 }
 
-uint16_t GetWordValue(const base::DictionaryValue* dict,
-                      const std::string& path) {
-  int val;
-  CHECK(dict->GetInteger(path, &val))
-      << "Failed to extract path " << path << " from printer config";
-  CHECK_LE(val, USHRT_MAX) << "Extracted value " << val
-                           << " is too large to fit into a word";
-  return static_cast<uint16_t>(val);
+uint16_t GetWordValue(const base::Value& dict, const std::string& path) {
+  CHECK(dict.is_dict()) << "Printer config is not a dictionary";
+  base::Optional<int> val = dict.FindIntPath(path);
+  CHECK(val.has_value()) << "Failed to extract path " << path
+                         << " from printer config";
+  CHECK_LE(*val, USHRT_MAX)
+      << "Extracted value " << *val << " is too large to fit into a word";
+  return static_cast<uint16_t>(*val);
 }
 
-const base::DictionaryValue* GetDescriptorDictionary(
-    const base::DictionaryValue* printer, const std::string& path) {
-  const base::DictionaryValue* descriptor;
-  CHECK(printer->GetDictionary(path, &descriptor))
-      << "Failed to extract " << path << " object from printer config";
-  return descriptor;
-}
-
-const base::ListValue* GetDescriptorList(const base::DictionaryValue* printer,
-                                         const std::string& path) {
-  const base::ListValue* list;
-  CHECK(printer->GetList(path, &list))
-      << "Failed to extract " << path << " list from printer config";
-  return list;
-}
-
-UsbDeviceDescriptor GetDeviceDescriptor(
-    const base::DictionaryValue* printer) {
-  const base::DictionaryValue* descriptor =
-      GetDescriptorDictionary(printer, "device_descriptor");
+UsbDeviceDescriptor GetDeviceDescriptor(const base::Value& printer) {
+  const base::Value* descriptor = printer.FindDictKey("device_descriptor");
+  CHECK(descriptor)
+      << "Failed to extract device_descriptor object from printer config";
   UsbDeviceDescriptor dev_dsc;
-  dev_dsc.bLength = GetByteValue(descriptor, "bLength");
+  dev_dsc.bLength = GetByteValue(*descriptor, "bLength");
   CHECK_EQ(dev_dsc.bLength, sizeof(dev_dsc))
       << "bLength value " << dev_dsc.bLength
       << " is not the same as the size of the device descriptor";
-  dev_dsc.bDescriptorType = GetByteValue(descriptor, "bDescriptorType");
-  dev_dsc.bcdUSB = GetWordValue(descriptor, "bcdUSB");
-  dev_dsc.bDeviceClass = GetByteValue(descriptor, "bDeviceClass");
-  dev_dsc.bDeviceSubClass = GetByteValue(descriptor, "bDeviceSubClass");
-  dev_dsc.bDeviceProtocol = GetByteValue(descriptor, "bDeviceProtocol");
-  dev_dsc.bMaxPacketSize0 = GetByteValue(descriptor, "bMaxPacketSize0");
-  dev_dsc.idVendor = GetWordValue(descriptor, "idVendor");
-  dev_dsc.idProduct = GetWordValue(descriptor, "idProduct");
-  dev_dsc.bcdDevice = GetWordValue(descriptor, "bcdDevice");
-  dev_dsc.iManufacturer = GetByteValue(descriptor, "iManufacturer");
-  dev_dsc.iProduct = GetByteValue(descriptor, "iProduct");
-  dev_dsc.iSerialNumber = GetByteValue(descriptor, "iSerialNumber");
-  dev_dsc.bNumConfigurations = GetByteValue(descriptor, "bNumConfigurations");
+  dev_dsc.bDescriptorType = GetByteValue(*descriptor, "bDescriptorType");
+  dev_dsc.bcdUSB = GetWordValue(*descriptor, "bcdUSB");
+  dev_dsc.bDeviceClass = GetByteValue(*descriptor, "bDeviceClass");
+  dev_dsc.bDeviceSubClass = GetByteValue(*descriptor, "bDeviceSubClass");
+  dev_dsc.bDeviceProtocol = GetByteValue(*descriptor, "bDeviceProtocol");
+  dev_dsc.bMaxPacketSize0 = GetByteValue(*descriptor, "bMaxPacketSize0");
+  dev_dsc.idVendor = GetWordValue(*descriptor, "idVendor");
+  dev_dsc.idProduct = GetWordValue(*descriptor, "idProduct");
+  dev_dsc.bcdDevice = GetWordValue(*descriptor, "bcdDevice");
+  dev_dsc.iManufacturer = GetByteValue(*descriptor, "iManufacturer");
+  dev_dsc.iProduct = GetByteValue(*descriptor, "iProduct");
+  dev_dsc.iSerialNumber = GetByteValue(*descriptor, "iSerialNumber");
+  dev_dsc.bNumConfigurations = GetByteValue(*descriptor, "bNumConfigurations");
   return dev_dsc;
 }
 
 UsbConfigurationDescriptor GetConfigurationDescriptor(
-    const base::DictionaryValue* printer) {
-  const base::DictionaryValue* descriptor =
-      GetDescriptorDictionary(printer, "configuration_descriptor");
+    const base::Value& printer) {
+  const base::Value* descriptor =
+      printer.FindDictKey("configuration_descriptor");
+  CHECK(descriptor) << "Failed to extract configuration_descriptor "
+                       "object from printer config";
   UsbConfigurationDescriptor cfg_dsc;
-  cfg_dsc.bLength = GetByteValue(descriptor, "bLength");
+  cfg_dsc.bLength = GetByteValue(*descriptor, "bLength");
   CHECK_EQ(cfg_dsc.bLength, sizeof(cfg_dsc))
       << "bLength value " << cfg_dsc.bLength
       << " is not the same as the size of the configuration descriptor";
-  cfg_dsc.bDescriptorType = GetByteValue(descriptor, "bDescriptorType");
-  cfg_dsc.wTotalLength = GetWordValue(descriptor, "wTotalLength");
-  cfg_dsc.bNumInterfaces = GetByteValue(descriptor, "bNumInterfaces");
-  cfg_dsc.bConfigurationValue = GetByteValue(descriptor, "bConfigurationValue");
-  cfg_dsc.iConfiguration = GetByteValue(descriptor, "iConfiguration");
-  cfg_dsc.bmAttributes = GetByteValue(descriptor, "bmAttributes");
-  cfg_dsc.bMaxPower = GetByteValue(descriptor, "bMaxPower");
+  cfg_dsc.bDescriptorType = GetByteValue(*descriptor, "bDescriptorType");
+  cfg_dsc.wTotalLength = GetWordValue(*descriptor, "wTotalLength");
+  cfg_dsc.bNumInterfaces = GetByteValue(*descriptor, "bNumInterfaces");
+  cfg_dsc.bConfigurationValue =
+      GetByteValue(*descriptor, "bConfigurationValue");
+  cfg_dsc.iConfiguration = GetByteValue(*descriptor, "iConfiguration");
+  cfg_dsc.bmAttributes = GetByteValue(*descriptor, "bmAttributes");
+  cfg_dsc.bMaxPower = GetByteValue(*descriptor, "bMaxPower");
   return cfg_dsc;
 }
 
 UsbDeviceQualifierDescriptor GetDeviceQualifierDescriptor(
-    const base::DictionaryValue* printer) {
-  const base::DictionaryValue* descriptor =
-      GetDescriptorDictionary(printer, "device_qualifier_descriptor");
+    const base::Value& printer) {
+  const base::Value* descriptor =
+      printer.FindDictKey("device_qualifier_descriptor");
+  CHECK(descriptor)
+      << "Failed to extract device_qualifier_descriptor object from printer "
+         "config";
   UsbDeviceQualifierDescriptor devq_dsc;
-  devq_dsc.bLength = GetByteValue(descriptor, "bLength");
+  devq_dsc.bLength = GetByteValue(*descriptor, "bLength");
   CHECK_EQ(devq_dsc.bLength, sizeof(devq_dsc))
       << "bLength value " << devq_dsc.bLength
       << " is not the same as the size of the device qualifier descriptor";
-  devq_dsc.bDescriptorType = GetByteValue(descriptor, "bDescriptorType");
-  devq_dsc.bcdUSB = GetWordValue(descriptor, "bcdUSB");
-  devq_dsc.bDeviceClass = GetByteValue(descriptor, "bDeviceClass");
-  devq_dsc.bDeviceSubClass = GetByteValue(descriptor, "bDeviceSubClass");
-  devq_dsc.bDeviceProtocol = GetByteValue(descriptor, "bDeviceProtocol");
-  devq_dsc.bMaxPacketSize0 = GetByteValue(descriptor, "bMaxPacketSize0");
-  devq_dsc.bNumConfigurations = GetByteValue(descriptor, "bNumConfigurations");
-  devq_dsc.bReserved = GetByteValue(descriptor, "bReserved");
+  devq_dsc.bDescriptorType = GetByteValue(*descriptor, "bDescriptorType");
+  devq_dsc.bcdUSB = GetWordValue(*descriptor, "bcdUSB");
+  devq_dsc.bDeviceClass = GetByteValue(*descriptor, "bDeviceClass");
+  devq_dsc.bDeviceSubClass = GetByteValue(*descriptor, "bDeviceSubClass");
+  devq_dsc.bDeviceProtocol = GetByteValue(*descriptor, "bDeviceProtocol");
+  devq_dsc.bMaxPacketSize0 = GetByteValue(*descriptor, "bMaxPacketSize0");
+  devq_dsc.bNumConfigurations = GetByteValue(*descriptor, "bNumConfigurations");
+  devq_dsc.bReserved = GetByteValue(*descriptor, "bReserved");
   return devq_dsc;
 }
 
 std::vector<UsbInterfaceDescriptor> GetInterfaceDescriptors(
-    const base::DictionaryValue* printer) {
-  const base::ListValue* list =
-      GetDescriptorList(printer, "interface_descriptors");
-  std::size_t size = list->GetSize();
+    const base::Value& printer) {
+  const base::Value* list = printer.FindListKey("interface_descriptors");
+  CHECK(list)
+      << "Failed to extract interface_descriptors list from printer config";
+  std::size_t size = list->GetList().size();
   std::vector<UsbInterfaceDescriptor> interfaces(size);
   for (std::size_t i = 0; i < size; ++i) {
-    const base::DictionaryValue* descriptor;
-    CHECK(list->GetDictionary(i, &descriptor))
+    const base::Value& descriptor = list->GetList()[i];
+    CHECK(descriptor.is_dict())
         << "Failed to extract object from list index " << i;
     interfaces[i] = GetInterfaceDescriptor(descriptor);
   }
   return interfaces;
 }
 
-UsbInterfaceDescriptor GetInterfaceDescriptor(
-    const base::DictionaryValue* descriptor) {
+UsbInterfaceDescriptor GetInterfaceDescriptor(const base::Value& descriptor) {
   UsbInterfaceDescriptor intf_dsc;
   intf_dsc.bLength = GetByteValue(descriptor, "bLength");
   CHECK_EQ(intf_dsc.bLength, sizeof(intf_dsc))
@@ -160,22 +150,26 @@ UsbInterfaceDescriptor GetInterfaceDescriptor(
 }
 
 std::map<uint8_t, std::vector<UsbEndpointDescriptor>> GetEndpointDescriptorMap(
-    const base::DictionaryValue* printer) {
-  const base::ListValue* interfaces_list =
-      GetDescriptorList(printer, "interface_descriptors");
+    const base::Value& printer) {
+  const base::Value* interfaces_list =
+      printer.FindListKey("interface_descriptors");
+  CHECK(interfaces_list)
+      << "Failed to extract interface_descriptors list from printer config";
   std::map<uint8_t, std::vector<UsbEndpointDescriptor>> endpoints_map;
-  for (size_t i = 0; i < interfaces_list->GetSize(); ++i) {
-    const base::DictionaryValue* interface_dictionary;
-    CHECK(interfaces_list->GetDictionary(i, &interface_dictionary))
+  for (size_t i = 0; i < interfaces_list->GetList().size(); ++i) {
+    const base::Value& interface_dictionary = interfaces_list->GetList()[i];
+    CHECK(interface_dictionary.is_dict())
         << "Failed to extract object from list index " << i;
     UsbInterfaceDescriptor interface =
         GetInterfaceDescriptor(interface_dictionary);
 
-    const base::ListValue* endpoints_list =
-        GetDescriptorList(interface_dictionary, "endpoints");
-    for (size_t j = 0; j < endpoints_list->GetSize(); ++j) {
-      const base::DictionaryValue* endpoint_dictionary;
-      CHECK(endpoints_list->GetDictionary(j, &endpoint_dictionary))
+    const base::Value* endpoints_list =
+        interface_dictionary.FindListKey("endpoints");
+    CHECK(endpoints_list)
+        << "Failed to extract endpoints list from printer config";
+    for (size_t j = 0; j < endpoints_list->GetList().size(); ++j) {
+      const base::Value& endpoint_dictionary = endpoints_list->GetList()[j];
+      CHECK(endpoint_dictionary.is_dict())
           << "Failed to extract the object from list index " << j;
       UsbEndpointDescriptor endpoint =
           GetEndpointDescriptor(endpoint_dictionary);
@@ -187,8 +181,7 @@ std::map<uint8_t, std::vector<UsbEndpointDescriptor>> GetEndpointDescriptorMap(
   return endpoints_map;
 }
 
-UsbEndpointDescriptor GetEndpointDescriptor(
-    const base::DictionaryValue* descriptor) {
+UsbEndpointDescriptor GetEndpointDescriptor(const base::Value& descriptor) {
   UsbEndpointDescriptor endp_dsc;
   endp_dsc.bLength = GetByteValue(descriptor, "bLength");
   CHECK_EQ(endp_dsc.bLength, sizeof(endp_dsc))
@@ -221,39 +214,41 @@ std::vector<char> ConvertStringToStringDescriptor(const std::string& str) {
 }
 
 std::vector<std::vector<char>> GetStringDescriptors(
-    const base::DictionaryValue* printer) {
-  const base::DictionaryValue* descriptor =
-      GetDescriptorDictionary(printer, "language_descriptor");
+    const base::Value& printer) {
+  const base::Value* descriptor = printer.FindDictKey("language_descriptor");
+  CHECK(descriptor)
+      << "Failed to extract language_descriptor object from printer config";
   std::vector<char> language(4);
-  language[0] = GetByteValue(descriptor, "bLength");
-  language[1] = GetByteValue(descriptor, "bDescriptorType");
-  language[2] = GetByteValue(descriptor, "langID1");
-  language[3] = GetByteValue(descriptor, "langID2");
+  language[0] = GetByteValue(*descriptor, "bLength");
+  language[1] = GetByteValue(*descriptor, "bDescriptorType");
+  language[2] = GetByteValue(*descriptor, "langID1");
+  language[3] = GetByteValue(*descriptor, "langID2");
 
-  const base::ListValue* list =
-      GetDescriptorList(printer, "string_descriptors");
+  const base::Value* list = printer.FindListKey("string_descriptors");
+  CHECK(list)
+      << "Failed to extract string_descriptors list from printer config";
   std::vector<std::vector<char>> strings;
   strings.push_back(language);
-  for (std::size_t i = 0; i < list->GetSize(); ++i) {
-    std::string str;
-    CHECK(list->GetString(i, &str))
+  for (std::size_t i = 0; i < list->GetList().size(); ++i) {
+    const base::Value& value = list->GetList()[i];
+    CHECK(value.is_string())
         << "Failed to extract string from list index " << i;
-    strings.emplace_back(ConvertStringToStringDescriptor(str));
+    strings.emplace_back(ConvertStringToStringDescriptor(value.GetString()));
   }
   return strings;
 }
 
-std::vector<char> GetIEEEDeviceId(const base::DictionaryValue* printer) {
-  const base::DictionaryValue* descriptor =
-      GetDescriptorDictionary(printer, "ieee_device_id");
+std::vector<char> GetIEEEDeviceId(const base::Value& printer) {
+  const base::Value* descriptor = printer.FindDictKey("ieee_device_id");
+  CHECK(descriptor)
+      << "Failed to extract ieee_device_id object from printer config";
   std::vector<char> ieee_device_id;
   ieee_device_id.push_back(
-      static_cast<char>(GetByteValue(descriptor, "bLength1")));
+      static_cast<char>(GetByteValue(*descriptor, "bLength1")));
   ieee_device_id.push_back(
-      static_cast<char>(GetByteValue(descriptor, "bLength2")));
-  std::string message;
-  CHECK(descriptor->GetString("message", &message))
-      << "Failed to extract \"message\" from ieee_device_id object";
-  ieee_device_id.insert(ieee_device_id.end(), message.begin(), message.end());
+      static_cast<char>(GetByteValue(*descriptor, "bLength2")));
+  const std::string* message = descriptor->FindStringKey("message");
+  CHECK(message) << "Failed to extract \"message\" from ieee_device_id object";
+  ieee_device_id.insert(ieee_device_id.end(), message->begin(), message->end());
   return ieee_device_id;
 }
