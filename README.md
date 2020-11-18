@@ -43,6 +43,12 @@ USE="usbip" ./build_packages --board=$BOARD
 
 ## How to Use
 
+Before the first use you have to load a required kernel module:
+
+```
+modprobe vhci-hcd
+```
+
 Run the virtual-usb-printer program:
 
 ```
